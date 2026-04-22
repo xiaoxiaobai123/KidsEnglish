@@ -20,9 +20,9 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-// 透传 fetch(不缓存,但必须有 handler 否则 Chrome 不认 PWA)
+// Fetch handler · 网络优先透传(以后升级 cache-first 可离线)
+// 必须有 respondWith 才不被 Chrome 当 no-op handler 警告
 self.addEventListener('fetch', (event) => {
-  // 网络优先,失败就直接挂(以后换 cache-first 就能离线)
-  // 不调用 respondWith 意味着走浏览器默认逻辑,相当于"什么都不改"
-  return;
+  if (event.request.method !== 'GET') return;
+  event.respondWith(fetch(event.request).catch(() => new Response('', { status: 504 })));
 });
