@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>英语闯关 · 一年级下册</title>
+
+  <!-- 开发期禁用缓存（确保脚本每次拿最新版） -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+
+  <!-- 视口：锁定缩放（防止孩子误触双指缩放） -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+
+  <!-- PWA 核心：清单 + 主题色 -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#FFB84D">
+  <meta name="background-color" content="#FFF8E7">
+
+  <!-- iOS PWA 支持（Safari / 各家套壳浏览器） -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="英语闯关">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+  <!-- Windows Tile -->
+  <meta name="msapplication-TileColor" content="#FFB84D">
+  <meta name="msapplication-TileImage" content="icons/icon-192.png">
+
+  <!-- SEO / 描述 -->
+  <meta name="description" content="译林版一年级下册英语学习助手 —— 两周闯关，吃透全册。">
+  <meta name="format-detection" content="telephone=no">
+
+  <!-- favicon 占位 -->
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+
+  <!-- 主样式表 · 版本号从 __APP_VERSION__ 注入(绕过缓存) -->
+  <script>window.__APP_VERSION__ = '20260422j';</script>
+  <script>
+    (function(){
+      var l = document.createElement('link');
+      l.rel = 'stylesheet';
+      l.href = 'styles.css?v=' + window.__APP_VERSION__;
+      document.head.appendChild(l);
+    })();
+  </script>
+
+  <!-- 启动闪屏（app.js 加载前的占位，防止白屏） -->
+  <style>
+    #loading-splash {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      background: #FFF8E7;
+      z-index: 10000;
+      font-family: 'ZCOOL KuaiLe', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      color: #2C2C54;
+    }
+    #loading-splash .logo {
+      font-size: 5rem;
+      animation: splash-bounce 1s ease-in-out infinite;
+    }
+    #loading-splash .text {
+      font-size: 1.3rem;
+      color: #4A4A7A;
+    }
+    @keyframes splash-bounce {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50%      { transform: translateY(-12px) scale(1.05); }
+    }
+    #loading-splash.fade-out {
+      opacity: 0;
+      transition: opacity 0.4s;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ============ 启动闪屏（app.js 接管后移除） ============ -->
+  <div id="loading-splash">
+    <div class="logo">😆</div>
+    <div class="text">准备中...</div>
+  </div>
+
+  <!-- ============ APP 主壳 ============ -->
+  <div class="app-shell">
+
+    <!-- —— 顶栏（骨架静态，内容动态） —— -->
+    <header class="topbar">
+      <div class="logo">
+        <span class="logo-emoji" id="logo-emoji">😆</span>
+        <span id="app-title">英语闯关</span>
+      </div>
+
+      <div class="actions">
+        <!-- 主页按钮（菜单屏时隐藏） -->
+        <button class="btn btn--icon btn--sm" id="btn-home" title="回主页" aria-label="回主页" hidden>🏠</button>
+
+        <!-- Day 切换器 -->
+        <div class="day-switcher" id="day-switcher">
+          <button class="btn btn--icon btn--sm" id="btn-day-prev" aria-label="前一天">‹</button>
+          <span class="day-num" id="day-num">Day 1</span>
+          <button class="btn btn--icon btn--sm" id="btn-day-next" aria-label="后一天">›</button>
+        </div>
+
+        <!-- 积分徽章 -->
+        <span class="badge badge--score" id="score-badge">⭐ 0</span>
+      </div>
+    </header>
+
+    <!-- —— 主内容区（10 个屏幕占位，app.js 按需填充/切换） —— -->
+    <main class="main" id="app-main">
+
+      <!-- 1. 主菜单 -->
+      <section class="screen active" id="screen-menu" data-screen="menu"></section>
+
+      <!-- 2. 闯关课程（5 关内部状态由 app.js 管理） -->
+      <section class="screen" id="screen-lesson" data-screen="lesson"></section>
+
+      <!-- 3. 结算页 -->
+      <section class="screen" id="screen-result" data-screen="result"></section>
+
+      <!-- 4. 默写本 -->
+      <section class="screen" id="screen-dictation" data-screen="dictation"></section>
+
+      <!-- 5. 单元测验 -->
+      <section class="screen" id="screen-quiz" data-screen="quiz"></section>
+
+      <!-- 6. 闪卡 -->
+      <section class="screen" id="screen-flashcards" data-screen="flashcards"></section>
+
+      <!-- 7. 词库 -->
+      <section class="screen" id="screen-vocab" data-screen="vocab"></section>
+
+      <!-- 8. 句库 -->
+      <section class="screen" id="screen-sentences" data-screen="sentences"></section>
+
+      <!-- 9. 进度看板 -->
+      <section class="screen" id="screen-dashboard" data-screen="dashboard"></section>
+
+      <!-- 10. 打印中心 -->
+      <section class="screen" id="screen-print" data-screen="print"></section>
+
+      <!-- 11. 设置（Phase 1.5 新增） -->
+      <section class="screen" id="screen-settings" data-screen="settings"></section>
+
+      <!-- 12. 错题回顾 -->
+      <section class="screen" id="screen-review" data-screen="review"></section>
+
+      <!-- 13. 单词闯关 (SRS) -->
+      <section class="screen" id="screen-vocabsrs" data-screen="vocabsrs"></section>
+
+      <!-- 14. 今日任务板 -->
+      <section class="screen" id="screen-tasks" data-screen="tasks"></section>
+
+    </main>
+
+    <!-- Cory 教练气泡（所有屏共用，app.js 控制显示/隐藏） -->
+    <div id="coach-bubble" class="coach-bubble hidden" aria-live="polite">
+      <div class="coach-avatar" id="coach-avatar">🐱</div>
+      <div class="coach-text">
+        <div class="coach-en" id="coach-en"></div>
+        <div class="coach-zh" id="coach-zh"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 全局覆盖层容器 ============ -->
+  <div id="modal-root"></div>
+  <div id="toast-root"></div>
+  <div id="confetti-root" aria-hidden="true"></div>
+
+  <!-- ============ 脚本加载顺序：数据 → 逻辑 ============ -->
+  <!-- 开发期：加 ?v=<时间戳> 防止浏览器缓存旧版 -->
+  <!-- (__APP_VERSION__ 已在前面 styles 版本号里定义,避免重复) -->
+  <script>
+    (function(){
+      var v = window.__APP_VERSION__;
+      ['data-vocab.js','data-sentences.js','data-coach.js','data-quiz.js','app.js'].forEach(function(f){
+        var s = document.createElement('script');
+        s.src = f + '?v=' + v;
+        s.async = false;           // 保持加载顺序
+        document.head.appendChild(s);
+      });
+    })();
+  </script>
+
+  <!-- ============ Service Worker 注册（优雅降级，sw.js 缺失不报错） ============ -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {
+          // sw.js 暂未提供（Phase 2 再补），静默忽略
+        });
+      });
+    }
+
+    // 全局未捕获异常日志（开发调试用）
+    window.addEventListener('error', (e) => {
+      console.error('[App Error]', e.message, e.filename, e.lineno);
+    });
+    window.addEventListener('unhandledrejection', (e) => {
+      console.error('[App Promise Rejection]', e.reason);
+    });
+  </script>
+</body>
+</html>

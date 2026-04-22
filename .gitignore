@@ -1,0 +1,28 @@
+.env
+.env.*
+scripts/__pycache__/
+*.pyc
+node_modules/
+.DS_Store
+
+# 备份 / 测试目录(不部署)
+audio/vocab_minimax_backup/
+audio/letters_minimax_backup/
+audio/vocab_v2/
+audio/_mw_test/
+audio/_voice_compare/
+audio/_voice_samples/
+audio/_phonics_test/
+audio/_param_test/
+audio/_edge_test/
+
+# Claude workspace
+.claude/worktrees/
+
+# 图片/PDF 文档(不需要部署到 web)
+1年级英语下册.pdf
+微信图片_*.jpg
+
+# 系统文件
+Thumbs.db
+desktop.ini
