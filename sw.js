@@ -1,23 +1,23 @@
 /**
- * sw.js · cache-first 离线缓存
+ * sw.js · Eager pre-cache · 首次安装时下全部音频/图片
  * ============================================================
  * 策略:
- *   install 阶段:预缓存"核心文件"(HTML / JS / CSS / manifests / 图标)
- *   运行时:所有请求 cache-first(先查本地缓存,没有再网络)
- *         网络响应也顺便存进 cache,下次秒出
+ *   install 阶段:
+ *     1) 核心文件(HTML/JS/CSS/manifest/icons)同步预缓存 — 快
+ *     2) 读 audio manifest 等清单 → 后台并发下载全部媒体 — 不阻塞 install
+ *   运行时:
+ *     所有请求 cache-first(含音频/图片/字母)
+ *     MP3 特别处理:发送不带 Range 的 fetch 避免 206 Partial 跳过缓存
  *
  * 效果:
- *   首次访问:~15-30 秒下载 30MB 到 pad 存储
- *   之后:所有交互零网络延迟,跟本地 APP 一样
- *   断网:仍可用
- *
- * 升级:每次 VERSION 变,旧缓存自动清
+ *   首次安装完,后台 30-60 秒下完所有 ~30MB 资源 → 之后永久零延迟
+ *   中间网挂也没事,下次打开接着下
  * ============================================================ */
 
-const VERSION = '20260422l';
+const VERSION = '20260422m';
 const CACHE_NAME = `englishkids-${VERSION}`;
 
-// 小文件,install 时一次性拉下来
+// 核心文件(小,一定要下,install 阻塞直到完成)
 const CORE_FILES = [
   './',
   './index.html',
@@ -37,22 +37,92 @@ const CORE_FILES = [
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(CORE_FILES))
-      .then(() => self.skipWaiting())
-      .catch(err => console.warn('[SW] install precache failed:', err))
-  );
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    try { await cache.addAll(CORE_FILES); } catch (e) { console.warn('[SW] core precache fail', e); }
+    // 非阻塞:后台预下全部媒体(不影响 install 完成)
+    precacheMedia(cache).catch(err => console.warn('[SW] media precache fail', err));
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then(names =>
-      Promise.all(names.map(n => n !== CACHE_NAME ? caches.delete(n) : null))
-    ).then(() => self.clients.claim())
-  );
+  event.waitUntil((async () => {
+    const names = await caches.keys();
+    await Promise.all(names.map(n => n !== CACHE_NAME ? caches.delete(n) : null));
+    await self.clients.claim();
+  })());
 });
 
-// Cache-first for same-origin static assets; network for everything else
+// ─── Eager precache:后台下全部 audio + images ────────────────
+async function precacheMedia(cache) {
+  const urls = await buildMediaUrlList();
+  broadcast({ type: 'precache-start', total: urls.length });
+
+  // 并发 15,分批避免 overload
+  const BATCH = 15;
+  let done = 0;
+  for (let i = 0; i < urls.length; i += BATCH) {
+    const batch = urls.slice(i, i + BATCH);
+    await Promise.allSettled(batch.map(async (url) => {
+      try {
+        const req = new Request(url);
+        if (await cache.match(req)) { done++; return; }
+        // 强制不带 Range 的完整 fetch,避免 206
+        const resp = await fetch(url, { mode: 'same-origin' });
+        if (resp.ok && resp.status === 200) {
+          await cache.put(req, resp);
+        }
+      } catch (e) { /* 单个失败不影响整体 */ }
+      done++;
+    }));
+    broadcast({ type: 'precache-progress', done, total: urls.length });
+  }
+  broadcast({ type: 'precache-done', total: urls.length });
+}
+
+async function buildMediaUrlList() {
+  const urls = new Set();
+  // 1. audio manifest
+  try {
+    const m = await fetch('./audio/manifest.json').then(r => r.json());
+    (m.sentences || []).forEach(id => urls.add(`./audio/sentences/${id}.mp3`));
+    (m.vocab || []).forEach(id => urls.add(`./audio/vocab/${id}.mp3`));
+    Object.keys(m.coach || {}).forEach(id => {
+      urls.add(`./audio/coach/${id}.mp3`);
+      urls.add(`./audio/coach/${id}_ethan.mp3`);  // 多名字兜底
+    });
+  } catch (e) {}
+  // 2. images manifest
+  try {
+    const m = await fetch('./audio/images/manifest.json').then(r => r.json());
+    (m.vocab || []).forEach(id => urls.add(`./audio/images/vocab/${id}.jpg`));
+    (m.sentences || []).forEach(id => urls.add(`./audio/images/sentences/${id}.jpg`));
+  } catch (e) {}
+  // 3. letters + phonemes (A-Z,两套)
+  for (const c of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') {
+    urls.add(`./audio/letters/${c}.mp3`);
+    urls.add(`./audio/phonemes/${c}.mp3`);
+  }
+  // 4. tangtang rewards
+  try {
+    const m = await fetch('./audio/tangtang-spell-manifest.json').then(r => r.json());
+    const collect = (obj) => {
+      if (Array.isArray(obj)) obj.forEach(x => typeof x === 'string' && urls.add(`./audio/tangtang/${x}.mp3`));
+      else if (obj && typeof obj === 'object') {
+        Object.values(obj).forEach(v => { if (typeof v === 'string') urls.add(`./audio/tangtang/${v}.mp3`); else collect(v); });
+      }
+    };
+    collect(m);
+  } catch (e) {}
+  return Array.from(urls);
+}
+
+function broadcast(msg) {
+  self.clients.matchAll().then(clients => clients.forEach(c => c.postMessage(msg)));
+}
+
+// ─── 运行时 fetch handler ────────────────────────────────────
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
@@ -62,20 +132,16 @@ self.addEventListener('fetch', (event) => {
   const isCacheable = /\.(mp3|jpg|jpeg|png|woff2|json|js|css|html|ico)$/.test(url.pathname) || url.pathname === '/' || url.pathname.endsWith('/');
   if (!isCacheable) return;
 
-  // 判断是否为媒体资源(<audio>/<video> 会发 Range 请求,必须特殊处理)
   const isMedia = /\.(mp3|mp4|wav|webm|ogg|m4a)$/.test(url.pathname);
 
   event.respondWith((async () => {
-    // 1. 查缓存(忽略 Range 头差异 · 缓存存的是完整文件)
     const cache = await caches.open(CACHE_NAME);
     const cached = await cache.match(req, { ignoreSearch: false, ignoreVary: true });
     if (cached) return cached;
 
-    // 2. 媒体资源:用不带 Range 的新请求抓**完整文件**,避免 206 Partial Content 进缓存
-    const fetchReq = isMedia ? new Request(req.url, { mode: 'cors', credentials: 'same-origin' }) : req;
+    const fetchReq = isMedia ? new Request(req.url, { mode: 'same-origin' }) : req;
     try {
       const resp = await fetch(fetchReq);
-      // 只缓存 200(完整响应),不缓存 206(部分响应)
       if (resp.ok && resp.status === 200) {
         cache.put(req, resp.clone()).catch(() => {});
       }
