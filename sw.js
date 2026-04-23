@@ -14,7 +14,7 @@
  * 升级:每次 VERSION 变,旧缓存自动清
  * ============================================================ */
 
-const VERSION = '20260422k';
+const VERSION = '20260422l';
 const CACHE_NAME = `englishkids-${VERSION}`;
 
 // 小文件,install 时一次性拉下来
@@ -59,20 +59,29 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;
 
-  // 只缓存静态资源,放过 data:/blob: 等特殊请求
   const isCacheable = /\.(mp3|jpg|jpeg|png|woff2|json|js|css|html|ico)$/.test(url.pathname) || url.pathname === '/' || url.pathname.endsWith('/');
   if (!isCacheable) return;
 
-  event.respondWith(
-    caches.match(req).then(cached => {
-      if (cached) return cached;  // 命中缓存,0 延迟
-      return fetch(req).then(resp => {
-        if (resp.ok && resp.status === 200) {
-          const copy = resp.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(req, copy)).catch(() => {});
-        }
-        return resp;
-      }).catch(() => cached || new Response('', { status: 504, statusText: 'Offline' }));
-    })
-  );
+  // 判断是否为媒体资源(<audio>/<video> 会发 Range 请求,必须特殊处理)
+  const isMedia = /\.(mp3|mp4|wav|webm|ogg|m4a)$/.test(url.pathname);
+
+  event.respondWith((async () => {
+    // 1. 查缓存(忽略 Range 头差异 · 缓存存的是完整文件)
+    const cache = await caches.open(CACHE_NAME);
+    const cached = await cache.match(req, { ignoreSearch: false, ignoreVary: true });
+    if (cached) return cached;
+
+    // 2. 媒体资源:用不带 Range 的新请求抓**完整文件**,避免 206 Partial Content 进缓存
+    const fetchReq = isMedia ? new Request(req.url, { mode: 'cors', credentials: 'same-origin' }) : req;
+    try {
+      const resp = await fetch(fetchReq);
+      // 只缓存 200(完整响应),不缓存 206(部分响应)
+      if (resp.ok && resp.status === 200) {
+        cache.put(req, resp.clone()).catch(() => {});
+      }
+      return resp;
+    } catch (e) {
+      return new Response('', { status: 504, statusText: 'Offline' });
+    }
+  })());
 });
