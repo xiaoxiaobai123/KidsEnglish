@@ -4100,6 +4100,8 @@
     let recStream = null;
     let chunks = [];
     let recordedUrl = null;
+    let recStartMs = 0;
+    let playbackAudio = null;  // 独立于 currentAudio,避免被 stopCurrent 误杀
 
     panel.appendChild(h('div', { class: 'voice-title' }, '🎯 跟我说!'));
     const imgUrl = getVocabImageUrl(word.id);
@@ -4132,18 +4134,33 @@
         mediaRecorder = mt ? new MediaRecorder(recStream, { mimeType: mt }) : new MediaRecorder(recStream);
         mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunks.push(e.data); };
         mediaRecorder.onstop = () => {
-          recordedBlob = new Blob(chunks, { type: mt || 'audio/webm' });
+          const durMs = Date.now() - recStartMs;
+          recordedBlob = new Blob(chunks, { type: mediaRecorder.mimeType || mt || 'audio/webm' });
           if (recordedUrl) URL.revokeObjectURL(recordedUrl);
           recordedUrl = URL.createObjectURL(recordedBlob);
           if (recStream) { recStream.getTracks().forEach(t => t.stop()); recStream = null; }
           recBtn.textContent = '🎤 重录';
           recBtn.classList.remove('recording');
-          playBtn.disabled = false;
-          compareBtn.disabled = false;
+          // 录音太短(<0.3s)或 blob 几乎空(<500B)→ 警告
+          if (durMs < 300 || recordedBlob.size < 500) {
+            statusEl.textContent = '⚠️ 录音太短或没录到声音,请重录 · ' + recordedBlob.size + 'B ' + durMs + 'ms';
+            statusEl.style.color = '#c40';
+            playBtn.disabled = true;
+            compareBtn.disabled = true;
+          } else {
+            statusEl.textContent = '🎉 录了 ' + (durMs / 1000).toFixed(1) + '秒 · 点下面按钮听';
+            statusEl.style.color = '#090';
+            playBtn.disabled = false;
+            compareBtn.disabled = false;
+          }
         };
-        mediaRecorder.start();
+        // 每 200ms 收集一次 chunk,避免停止后没数据
+        mediaRecorder.start(200);
+        recStartMs = Date.now();
         recBtn.textContent = '⏹ 停止';
         recBtn.classList.add('recording');
+        statusEl.textContent = '🔴 录音中... 说 "' + word.en + '" 完了再按停止';
+        statusEl.style.color = '#c03';
       } catch (e) {
         alert('无法访问麦克风 · 请授权后重试\n\n' + (e.message || e.name || ''));
       }
@@ -4158,27 +4175,48 @@
       else startRecording();
     });
 
-    playBtn.addEventListener('click', () => {
-      if (!recordedUrl) return;
-      stopCurrent();
-      const a = new Audio(recordedUrl);
-      currentAudio = a;
-      a.play().catch(() => {});
+    function playMyRecording() {
+      if (!recordedUrl) return Promise.resolve();
+      if (playbackAudio) { try { playbackAudio.pause(); } catch(e){} }
+      playbackAudio = new Audio(recordedUrl);
+      return new Promise(res => {
+        playbackAudio.onended = res;
+        playbackAudio.onerror = (err) => {
+          statusEl.textContent = '⚠️ 播放失败 · 浏览器可能不支持此音频格式(' + (mediaRecorder?.mimeType || '?') + ')';
+          statusEl.style.color = '#c40';
+          res();
+        };
+        const p = playbackAudio.play();
+        if (p && p.catch) p.catch(e => { statusEl.textContent = '⚠️ 播放被阻止: ' + e.name; res(); });
+      });
+    }
+
+    playBtn.addEventListener('click', async () => {
+      statusEl.textContent = '🔊 播放中...';
+      statusEl.style.color = '#06a';
+      await playMyRecording();
+      statusEl.textContent = '✅ 听完了 · 觉得怎样?';
+      statusEl.style.color = '#090';
     });
 
     compareBtn.addEventListener('click', async () => {
       if (!recordedUrl) return;
       const refUrl = resolveQuizAsset('vocab:' + word.id, 'audio') || `./audio/vocab/${word.id}.mp3`;
+      statusEl.textContent = '🔊 老师先读...';
+      statusEl.style.color = '#06a';
       await playMp3(refUrl);
       await sleep(400);
-      stopCurrent();
-      const a = new Audio(recordedUrl);
-      currentAudio = a;
-      a.play().catch(() => {});
+      statusEl.textContent = '🎤 现在听你的...';
+      await playMyRecording();
+      statusEl.textContent = '✅ 对比完了 · 像不像?';
+      statusEl.style.color = '#090';
     });
 
     actions.append(refBtn, recBtn, playBtn, compareBtn);
     panel.appendChild(actions);
+
+    const statusEl = h('div', { class: 'voice-status' }, '👆 先点 🔊 听老师,再按 🎤 说一遍');
+    panel.appendChild(statusEl);
 
     const footer = h('div', { class: 'voice-footer' });
     const okBtn = h('button', { class: 'btn btn--lg btn--pink' }, '✓ 我说对了!');
@@ -4197,6 +4235,7 @@
     function close() {
       if (mediaRecorder && mediaRecorder.state === 'recording') { try { mediaRecorder.stop(); } catch(e){} }
       if (recStream) recStream.getTracks().forEach(t => t.stop());
+      if (playbackAudio) { try { playbackAudio.pause(); } catch(e){} playbackAudio = null; }
       if (recordedUrl) URL.revokeObjectURL(recordedUrl);
       stopAllAudio();
       bd.remove();

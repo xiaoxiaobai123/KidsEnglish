@@ -2951,10 +2951,14 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
 .voice-panel {
   max-width: 560px !important;
   width: calc(100% - 32px);
-  padding: 28px 24px !important;
+  max-height: 92vh;
+  overflow-y: auto;
+  padding: 24px 22px !important;
   text-align: center;
   animation: popquiz-bounce 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55);
 }
+.voice-panel > * + * { margin-top: 12px; }
+.voice-panel .popquiz-img { width: 180px; height: 180px; margin-left: auto; margin-right: auto; }
 .voice-title {
   font-family: var(--font-zh-title);
   font-size: 1.6rem;
@@ -3003,6 +3007,14 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
   gap: 12px;
   margin-top: 18px;
   flex-wrap: wrap;
+}
+.voice-status {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink-light);
+  padding: 6px 12px;
+  min-height: 28px;
+  text-align: center;
 }
 
 /* Phonic 视觉提示 (silent 字母 dim / 长元音 glow / 双字母 link) */
