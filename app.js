@@ -2460,10 +2460,10 @@
   }
 
   function renderQuizSection() {
-    // 记住滚动位置,重渲后恢复(否则选答案会跳回顶部)
-    // quiz 页的滚容器可能是 #screen-quiz 或整个 window,两个都保一份
-    const prevScreenScroll = $('#screen-quiz')?.scrollTop ?? 0;
-    const prevWindowScroll = window.scrollY || 0;
+    // 记住滚动位置 · 真正的滚容器是 .quiz-body (styles.css:1622 overflow-y:auto)
+    // 选答案后 renderQuizSection 会重建整个 .quiz-body,scrollTop 归零 → 页面跳顶
+    const prevQuizBody = document.querySelector('.quiz-body');
+    const prevScroll = prevQuizBody ? prevQuizBody.scrollTop : 0;
     switchScreen('quiz');
     hideCoach();
     const screen = $('#screen-quiz');
@@ -2491,11 +2491,11 @@
       return;
     }
     renderer(section, body);
-    // 恢复滚动位置(放到下一帧,等 DOM 布局完才能 scroll)
-    requestAnimationFrame(() => {
-      if (prevScreenScroll > 0) screen.scrollTop = prevScreenScroll;
-      if (prevWindowScroll > 0) window.scrollTo(0, prevWindowScroll);
-    });
+    // 恢复滚动位置:新建的 body 就是新 .quiz-body,直接给它 scrollTop
+    // rAF 保证布局完才 set
+    if (prevScroll > 0) {
+      requestAnimationFrame(() => { body.scrollTop = prevScroll; });
+    }
   }
 
   function buildQuizHeader(section) {
