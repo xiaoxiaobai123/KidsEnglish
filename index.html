@@ -35,16 +35,9 @@
   <!-- favicon 占位 -->
   <link rel="icon" type="image/png" href="icons/icon-192.png">
 
-  <!-- 主样式表 · 版本号从 __APP_VERSION__ 注入(绕过缓存) -->
-  <script>window.__APP_VERSION__ = '20260423c';</script>
-  <script>
-    (function(){
-      var l = document.createElement('link');
-      l.rel = 'stylesheet';
-      l.href = 'styles.css?v=' + window.__APP_VERSION__;
-      document.head.appendChild(l);
-    })();
-  </script>
+  <!-- 主样式表 · 静态 link 标签,Vercel HTTP Cache-Control 控缓存 -->
+  <link rel="stylesheet" href="styles.css?v=20260423d">
+  <script>window.__APP_VERSION__ = '20260423d';</script>
 
   <!-- 启动闪屏（app.js 加载前的占位，防止白屏） -->
   <style>
