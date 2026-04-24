@@ -1961,12 +1961,18 @@
     // —— 数据卡 ——
     const dataCard = h('div', { class: 'settings-card' },
       h('h3', {}, '💾 数据'),
-      h('div', { class: 'hint' }, '清零所有进度（金币、星星、错题库）。')
+      h('div', { class: 'hint' }, '强制刷新 = 只清离线缓存,学习进度保留。')
     );
+    dataCard.appendChild(h('div', { class: 'settings-row' },
+      h('div', { class: 'label' }, '拿最新版'),
+      h('div', { class: 'control' },
+        h('button', { class: 'btn btn--sm btn--mint', onclick: forceRefreshApp }, '🔄 强制刷新')
+      )
+    ));
     dataCard.appendChild(h('div', { class: 'settings-row' },
       h('div', { class: 'label' }, '重置进度'),
       h('div', { class: 'control' },
-        h('button', { class: 'btn btn--sm btn--coral', onclick: confirmReset }, '🗑 清空')
+        h('button', { class: 'btn btn--sm btn--coral', onclick: confirmReset }, '🗑 清空全部')
       )
     ));
     page.appendChild(dataCard);
@@ -2126,6 +2132,37 @@
           renderSettings();
           toast('已重置');
         }}, '清零')
+      )
+    ));
+  }
+
+  // 强制从网络拿最新版:清 SW + caches,但不清 localStorage(进度保留)
+  // 给 iPad 青少年模式等 ?reset=1 URL 不好用的场景当按钮入口
+  async function forceRefreshApp() {
+    const m = modal(h('div', {},
+      h('h3', {}, '🔄 拿最新版'),
+      h('p', {}, '清离线缓存 + 重新拉新版。进度、金币、设置都保留。'),
+      h('p', { style: 'font-size: 0.85rem; color: var(--ink-light);' }, '清理后会自动刷新页面。'),
+      h('div', { class: 'modal-footer' },
+        h('button', { class: 'btn', onclick: () => m.close() }, '取消'),
+        h('button', { class: 'btn btn--mint', onclick: async () => {
+          m.close();
+          toast('清缓存中...');
+          try {
+            if ('caches' in window) {
+              const keys = await caches.keys();
+              await Promise.all(keys.map(k => caches.delete(k).catch(() => {})));
+            }
+          } catch(e) { console.warn('caches clear fail', e); }
+          try {
+            if (navigator.serviceWorker) {
+              const regs = await navigator.serviceWorker.getRegistrations();
+              await Promise.all(regs.map(r => r.unregister().catch(() => {})));
+            }
+          } catch(e) { console.warn('sw unregister fail', e); }
+          // 路径加时间戳绕 HTTP 缓存,确保拉新 index.html
+          location.replace(location.pathname + '?_=' + Date.now());
+        }}, '🔄 立刻刷新')
       )
     ));
   }
