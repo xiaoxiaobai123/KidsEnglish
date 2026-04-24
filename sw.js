@@ -14,7 +14,7 @@
  *   中间网挂也没事,下次打开接着下
  * ============================================================ */
 
-const VERSION = '20260423f';
+const VERSION = '20260423g';
 const CACHE_NAME = `englishkids-${VERSION}`;
 
 // 核心文件(小,一定要下,install 阻塞直到完成)
@@ -137,16 +137,17 @@ async function buildMediaUrlList() {
     urls.add(`./audio/letters/${c}.mp3`);
     urls.add(`./audio/phonemes/${c}.mp3`);
   }
-  // 4. tangtang rewards
+  // 4. tangtang 奖励 + spell 拼读
+  // 注意:manifest 结构是 { tangtang_voice: "...", spell_voice: "...", tangtang: [...], spell: [...] }
+  // - tangtang_voice / spell_voice 是 metadata 字符串,不是文件名,要跳过
+  // - tangtang 数组 → ./audio/tangtang/<id>.mp3
+  // - spell 数组 → ./audio/spell/<id>.mp3(不是 tangtang 目录!)
   try {
     const m = await fetch('./audio/tangtang-spell-manifest.json').then(r => r.json());
-    const collect = (obj) => {
-      if (Array.isArray(obj)) obj.forEach(x => typeof x === 'string' && urls.add(`./audio/tangtang/${x}.mp3`));
-      else if (obj && typeof obj === 'object') {
-        Object.values(obj).forEach(v => { if (typeof v === 'string') urls.add(`./audio/tangtang/${v}.mp3`); else collect(v); });
-      }
-    };
-    collect(m);
+    (Array.isArray(m.tangtang) ? m.tangtang : []).forEach(id =>
+      typeof id === 'string' && urls.add(`./audio/tangtang/${id}.mp3`));
+    (Array.isArray(m.spell) ? m.spell : []).forEach(id =>
+      typeof id === 'string' && urls.add(`./audio/spell/${id}.mp3`));
   } catch (e) {}
   return Array.from(urls);
 }
