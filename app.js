@@ -1037,6 +1037,7 @@
 
   /* -------- 关 2: 跟一跟 -------- */
   function stageFollow() {
+    stopAllAudio();    // 进入/切句时先停所有音频,避免和上句 audio 打架
     const main = $('#lesson-main');
     main.innerHTML = '';
     const s = LESSON.sentences[LESSON.sentenceIdx];
@@ -1088,10 +1089,12 @@
     main.appendChild(secondaryRow);
 
     teacherBtn.addEventListener('click', () => {
+      stopAllAudio();                     // 打断任何正在播的"听我的"/TTS
       statusEl.textContent = '🔊 老师读中...';
       speak(s.en);
     });
     slowBtn.addEventListener('click', () => {
+      stopAllAudio();
       statusEl.textContent = '🐢 老师慢读...';
       speak(s.en, { rate: 0.55 });
     });
@@ -1122,13 +1125,11 @@
           if (followBlob.size >= 200) {
             myBtn.disabled = false;
             compareBtn.disabled = false;
-            // 未识别出结果时才显示自动回放
+            // 不再自动回放(之前会和"听我的"按钮重复,放两遍)
+            // 识别已出结果时保持结果文案,否则提示用户主动播
             if (!followRecDone) {
-              statusEl.textContent = '🎉 录了 ' + (durMs / 1000).toFixed(1) + '秒 · 自动回放中...';
+              statusEl.textContent = '🎉 录了 ' + (durMs / 1000).toFixed(1) + '秒 · 按 🔊 听我的 回放,或 👂 对比听';
               statusEl.style.color = '#090';
-              setTimeout(() => playMyVoice(() => {
-                statusEl.textContent = '✅ 听到自己的了吗?按 👂 跟老师比,或重录';
-              }), 200);
             }
           } else {
             statusEl.textContent = '⚠️ 没录到声音(' + followBlob.size + 'B) · 检查麦克风权限';
@@ -1178,14 +1179,19 @@
 
     function playMyVoice(onEnd) {
       if (!followUrl) return;
+      stopCurrent();                      // 停任何正在播的 MP3/TTS
       const a = new Audio(followUrl);
-      a.onended = () => onEnd && onEnd();
+      currentAudio = a;                   // ⭐ 注册到全局 currentAudio,让 stopCurrent 能停掉它
+      const cleanup = () => { if (currentAudio === a) currentAudio = null; };
+      a.onended = () => { cleanup(); onEnd && onEnd(); };
       a.onerror = () => {
+        cleanup();
         statusEl.textContent = '⚠️ 播放失败';
         statusEl.style.color = '#c40';
         onEnd && onEnd();
       };
       a.play().catch(err => {
+        cleanup();
         statusEl.textContent = '⚠️ 播放被拦截 · 再点 "🔊 听我的"';
         statusEl.style.color = '#c80';
         onEnd && onEnd();
@@ -1198,11 +1204,13 @@
         try { if (followRec) followRec.abort(); } catch(e){}
         followMediaRecorder.stop();
       } else {
+        stopAllAudio();                   // 开始录音前停老师/我的/TTS,避免录进扬声器
         startRec();
       }
     });
 
     myBtn.addEventListener('click', () => {
+      stopAllAudio();                     // 打断老师/TTS/其他
       statusEl.textContent = '🔊 回放中...';
       statusEl.style.color = '#06a';
       playMyVoice(() => { statusEl.textContent = '✅ 听完了'; statusEl.style.color = '#090'; });
@@ -1210,10 +1218,14 @@
 
     compareBtn.addEventListener('click', async () => {
       if (!followUrl) return;
+      stopAllAudio();
+      const ep = audioEpoch();
       statusEl.textContent = '🔊 老师先读...';
       statusEl.style.color = '#06a';
       await speak(s.en);
+      if (ep !== audioEpoch()) return;   // 中途被打断(切句/另一个按钮)就不继续播我的
       await sleep(400);
+      if (ep !== audioEpoch()) return;
       statusEl.textContent = '🎤 轮到你的录音...';
       playMyVoice(() => { statusEl.textContent = '✅ 对比完了 · 像不像?'; statusEl.style.color = '#090'; });
     });
@@ -1222,7 +1234,9 @@
     main.appendChild(h('div', { style: 'color: var(--ink-light); margin-top: 24px; text-align: center;' }, '家长评分 → 进下一句:'));
     main.appendChild(makeStarRating(n => {
       LESSON.stageStars.follow = Math.max(LESSON.stageStars.follow, n);
-      // 清理当前句的录音资源
+      // 清理当前句:停所有音频 + 停识别 + 停录音 + 释放麦克风
+      stopAllAudio();
+      try { if (followRec) followRec.abort(); } catch(e){}
       if (followMediaRecorder && followMediaRecorder.state === 'recording') { try { followMediaRecorder.stop(); } catch(e){} }
       if (followStream) followStream.getTracks().forEach(t => t.stop());
       if (followUrl) URL.revokeObjectURL(followUrl);
