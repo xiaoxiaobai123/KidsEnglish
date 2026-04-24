@@ -3276,8 +3276,9 @@
     const userAns = section.userAnswers[item.id] = section.userAnswers[item.id] || {};
 
     if (!opts.review) {
-      const topRow = h('div', { class: 'quiz-item', style: 'justify-content: center;' });
-      const playAllBtn = h('button', { class: 'btn btn--lg btn--pink' }, '▶️ 顺序播 6 句');
+      // 紧凑控制条(不用 .quiz-item 大卡片,省 ~40px 给图片)
+      const topRow = h('div', { class: 'q-order-controls' });
+      const playAllBtn = h('button', { class: 'btn btn--sm btn--pink' }, '▶️ 顺序播 6 句');
       playAllBtn.addEventListener('click', async () => {
         playAllBtn.disabled = true;
         for (const ref of item.sequence) {
@@ -3286,16 +3287,17 @@
             if (!url) { res(); return; }
             stopCurrent();
             const a = new Audio(url);
-            a.playbackRate = 0.85;          // 放慢 · 小孩子来得及对照图
+            a.playbackRate = 0.85;
             currentAudio = a;
             a.onended = a.onerror = () => { if (currentAudio === a) currentAudio = null; res(); };
             a.play().catch(res);
           });
-          await new Promise(r => setTimeout(r, 1500));  // 500 → 1500ms 给吸收/标号时间
+          await new Promise(r => setTimeout(r, 1500));
         }
         playAllBtn.disabled = false;
       });
-      topRow.appendChild(playAllBtn);
+      const hint = h('span', { class: 'q-order-hint' }, '点数字给图片排序 · 1 最早,6 最晚');
+      topRow.append(playAllBtn, hint);
       body.appendChild(topRow);
     }
 
