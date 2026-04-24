@@ -36,13 +36,13 @@
   <link rel="icon" type="image/png" href="icons/icon-192.png">
 
   <!-- 主样式表 · 静态 link 标签,Vercel HTTP Cache-Control 控缓存 -->
-  <link rel="stylesheet" href="styles.css?v=20260423e">
+  <link rel="stylesheet" href="styles.css?v=20260423f">
   <!-- 外部字体 · 异步加载,不阻塞页面 -->
   <link rel="preconnect" href="https://fonts.font.im" crossorigin>
   <link rel="preconnect" href="https://fonts.gstatic.font.im" crossorigin>
   <link rel="stylesheet" href="https://fonts.font.im/css2?family=Fredoka:wght@400;500;600;700&family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@400;500;700&display=swap" media="print" onload="this.media='all'">
   <noscript><link rel="stylesheet" href="https://fonts.font.im/css2?family=Fredoka:wght@400;500;600;700&family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@400;500;700&display=swap"></noscript>
-  <script>window.__APP_VERSION__ = '20260423e';</script>
+  <script>window.__APP_VERSION__ = '20260423f';</script>
 
   <!-- 启动闪屏（app.js 加载前的占位，防止白屏） -->
   <style>
@@ -215,11 +215,14 @@
           bar.innerHTML = '🔁 第 ' + msg.round + ' 次重试(' + msg.count + ' 个失败项)';
         } else if (msg.type === 'precache-done') {
           if (msg.failed > 0) {
-            bar.innerHTML = '⚠️ 下载完成 ' + msg.cached + '/' + msg.total + '(' + msg.failed + ' 个失败,点击重试)';
+            const files = (msg.failedList || []).map(u => u.split('/').pop()).slice(0, 5).join(', ');
+            const more = msg.failed > 5 ? ' 等' : '';
+            bar.innerHTML = '⚠️ 下载 ' + msg.cached + '/' + msg.total + ' · <b>' + msg.failed + ' 失败</b>(' + files + more + ')<br><span style="font-size:11px;opacity:.8;">👆 点击重试</span>';
             bar.style.borderColor = '#dd4400';
             bar.style.color = '#aa2200';
             bar.style.cursor = 'pointer';
             bar.onclick = () => {
+              bar.innerHTML = '🔁 重试中...';
               if (navigator.serviceWorker.controller) {
                 navigator.serviceWorker.controller.postMessage({ type: 'precache-retry-manual' });
               }

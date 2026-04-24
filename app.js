@@ -4141,17 +4141,22 @@
           if (recStream) { recStream.getTracks().forEach(t => t.stop()); recStream = null; }
           recBtn.textContent = '🎤 重录';
           recBtn.classList.remove('recording');
-          // 录音太短(<0.3s)或 blob 几乎空(<500B)→ 警告
-          if (durMs < 300 || recordedBlob.size < 500) {
-            statusEl.textContent = '⚠️ 录音太短或没录到声音,请重录 · ' + recordedBlob.size + 'B ' + durMs + 'ms';
+          // 只要 blob 不是 0 字节,就允许回放 —— 让孩子自己判断
+          if (recordedBlob.size >= 200) {
+            playBtn.disabled = false;
+            compareBtn.disabled = false;
+            if (durMs < 300) {
+              statusEl.textContent = '⚠️ 录了 ' + (durMs / 1000).toFixed(1) + '秒 · 有点短,听听效果';
+              statusEl.style.color = '#c80';
+            } else {
+              statusEl.textContent = '🎉 录了 ' + (durMs / 1000).toFixed(1) + '秒 · 点下面听听';
+              statusEl.style.color = '#090';
+            }
+          } else {
+            statusEl.textContent = '⚠️ 完全没录到声音 · 请检查麦克风或重试';
             statusEl.style.color = '#c40';
             playBtn.disabled = true;
             compareBtn.disabled = true;
-          } else {
-            statusEl.textContent = '🎉 录了 ' + (durMs / 1000).toFixed(1) + '秒 · 点下面按钮听';
-            statusEl.style.color = '#090';
-            playBtn.disabled = false;
-            compareBtn.disabled = false;
           }
         };
         // 每 200ms 收集一次 chunk,避免停止后没数据
