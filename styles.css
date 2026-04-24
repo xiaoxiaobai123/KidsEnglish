@@ -2992,6 +2992,32 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
 .voice-rec-btn {
   position: relative;
 }
+/* Voice 面板专用 · disabled 按钮也保持可见(只是明显低饱和) */
+.voice-actions .btn:disabled {
+  opacity: 0.85 !important;
+  filter: grayscale(0.6);
+  background: #e8e8e8 !important;
+  color: #888 !important;
+  border-color: #aaa !important;
+  box-shadow: 3px 3px 0 #888 !important;
+  position: relative;
+}
+.voice-actions .btn:disabled::after {
+  content: '🔒';
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #fff;
+  border-radius: 50%;
+  font-size: 14px;
+  padding: 2px;
+  box-shadow: 1px 1px 0 #888;
+}
+/* 移动端:让按钮一行最多 2 个,看得清楚 */
+@media (max-width: 600px) {
+  .voice-actions { grid-template-columns: 1fr 1fr; display: grid !important; }
+  .voice-actions > button { width: 100%; }
+}
 .voice-rec-btn.recording {
   background: #ff3040 !important;
   color: #fff !important;
