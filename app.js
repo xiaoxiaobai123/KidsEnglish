@@ -1977,6 +1977,7 @@
       h('button', { class: 'btn btn--icon btn--lg', onclick: () => { idx = (idx - 1 + words.length) % words.length; render(); } }, '‹'),
       h('button', { class: 'btn btn--lg btn--pink', onclick: flip }, '🔄 翻面'),
       h('button', { class: 'btn btn--lg btn--yellow', onclick: () => speak(words[idx].en) }, '🔊 发音'),
+      h('button', { class: 'btn btn--lg btn--mint', onclick: () => showVoicePractice(words[idx]) }, '🎤 练说'),
       h('button', { class: 'btn btn--icon btn--lg', onclick: () => { idx = (idx + 1) % words.length; render(); } }, '›')
     );
 
@@ -4078,6 +4079,127 @@
       stopAllAudio();
       bd.remove();
       onDone && onDone(result);
+    }
+  }
+
+  /* ============================================================
+   * 🎤 口语练习组件(MediaRecorder + 回放 + 对比)
+   * ============================================================
+   * 流程:老师读 → 按下录我的 → 听我的 → 对比听 → ✓ 我说对了
+   * 完全纯浏览器 API,无需付费评测 key
+   * ============================================================ */
+  function showVoicePractice(word) {
+    if (!word || !word.en) return;
+    const bd = h('div', { class: 'modal-backdrop voice-backdrop' });
+    const panel = h('div', { class: 'modal voice-panel' });
+    bd.appendChild(panel);
+    $('#modal-root').appendChild(bd);
+
+    let mediaRecorder = null;
+    let recordedBlob = null;
+    let recStream = null;
+    let chunks = [];
+    let recordedUrl = null;
+
+    panel.appendChild(h('div', { class: 'voice-title' }, '🎯 跟我说!'));
+    const imgUrl = getVocabImageUrl(word.id);
+    if (imgUrl) panel.appendChild(h('div', { class: 'popquiz-img' }, h('img', { src: imgUrl, alt: word.en })));
+    panel.appendChild(h('div', { class: 'voice-word' }, word.en));
+    panel.appendChild(h('div', { class: 'voice-zh' }, word.zh));
+    if (word.ipa) panel.appendChild(h('div', { class: 'voice-ipa' }, word.ipa));
+
+    const actions = h('div', { class: 'voice-actions' });
+    const refBtn = h('button', { class: 'btn btn--lg btn--mint' }, '🔊 老师');
+    const recBtn = h('button', { class: 'btn btn--xl btn--pink voice-rec-btn' }, '🎤 按住说');
+    const playBtn = h('button', { class: 'btn btn--lg' }, '🔊 听我的');
+    const compareBtn = h('button', { class: 'btn btn--lg btn--yellow' }, '👂 对比听');
+    playBtn.disabled = true;
+    compareBtn.disabled = true;
+
+    refBtn.addEventListener('click', () => {
+      const url = resolveQuizAsset('vocab:' + word.id, 'audio') || `./audio/vocab/${word.id}.mp3`;
+      playMp3(url);
+    });
+
+    async function startRecording() {
+      try {
+        recStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        chunks = [];
+        let mt = '';
+        for (const t of ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg']) {
+          if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) { mt = t; break; }
+        }
+        mediaRecorder = mt ? new MediaRecorder(recStream, { mimeType: mt }) : new MediaRecorder(recStream);
+        mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunks.push(e.data); };
+        mediaRecorder.onstop = () => {
+          recordedBlob = new Blob(chunks, { type: mt || 'audio/webm' });
+          if (recordedUrl) URL.revokeObjectURL(recordedUrl);
+          recordedUrl = URL.createObjectURL(recordedBlob);
+          if (recStream) { recStream.getTracks().forEach(t => t.stop()); recStream = null; }
+          recBtn.textContent = '🎤 重录';
+          recBtn.classList.remove('recording');
+          playBtn.disabled = false;
+          compareBtn.disabled = false;
+        };
+        mediaRecorder.start();
+        recBtn.textContent = '⏹ 停止';
+        recBtn.classList.add('recording');
+      } catch (e) {
+        alert('无法访问麦克风 · 请授权后重试\n\n' + (e.message || e.name || ''));
+      }
+    }
+
+    function stopRecording() {
+      if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+    }
+
+    recBtn.addEventListener('click', () => {
+      if (mediaRecorder && mediaRecorder.state === 'recording') stopRecording();
+      else startRecording();
+    });
+
+    playBtn.addEventListener('click', () => {
+      if (!recordedUrl) return;
+      stopCurrent();
+      const a = new Audio(recordedUrl);
+      currentAudio = a;
+      a.play().catch(() => {});
+    });
+
+    compareBtn.addEventListener('click', async () => {
+      if (!recordedUrl) return;
+      const refUrl = resolveQuizAsset('vocab:' + word.id, 'audio') || `./audio/vocab/${word.id}.mp3`;
+      await playMp3(refUrl);
+      await sleep(400);
+      stopCurrent();
+      const a = new Audio(recordedUrl);
+      currentAudio = a;
+      a.play().catch(() => {});
+    });
+
+    actions.append(refBtn, recBtn, playBtn, compareBtn);
+    panel.appendChild(actions);
+
+    const footer = h('div', { class: 'voice-footer' });
+    const okBtn = h('button', { class: 'btn btn--lg btn--pink' }, '✓ 我说对了!');
+    okBtn.addEventListener('click', () => {
+      STATE.score += 2;
+      saveState();
+      renderTopbar();
+      toast('+2 ⭐ 说得棒!');
+      close();
+    });
+    const closeBtn = h('button', { class: 'btn btn--sm' }, '⏭ 跳过');
+    closeBtn.addEventListener('click', close);
+    footer.append(okBtn, closeBtn);
+    panel.appendChild(footer);
+
+    function close() {
+      if (mediaRecorder && mediaRecorder.state === 'recording') { try { mediaRecorder.stop(); } catch(e){} }
+      if (recStream) recStream.getTracks().forEach(t => t.stop());
+      if (recordedUrl) URL.revokeObjectURL(recordedUrl);
+      stopAllAudio();
+      bd.remove();
     }
   }
 

@@ -36,7 +36,7 @@
   <link rel="icon" type="image/png" href="icons/icon-192.png">
 
   <!-- 主样式表 · 版本号从 __APP_VERSION__ 注入(绕过缓存) -->
-  <script>window.__APP_VERSION__ = '20260422m';</script>
+  <script>window.__APP_VERSION__ = '20260423a';</script>
   <script>
     (function(){
       var l = document.createElement('link');
@@ -198,23 +198,37 @@
         navigator.serviceWorker.register('./sw.js').catch(e => console.warn('[SW] register fail:', e));
       });
 
-      // 监听 SW 广播的预下载进度
+      // 监听 SW 广播的预下载进度(含失败统计)
       navigator.serviceWorker.addEventListener('message', (e) => {
         const msg = e.data || {};
-        if (msg.type === 'precache-start' || msg.type === 'precache-progress' || msg.type === 'precache-done') {
-          let bar = document.getElementById('precache-indicator');
-          if (!bar) {
-            bar = document.createElement('div');
-            bar.id = 'precache-indicator';
-            bar.style.cssText = 'position:fixed;bottom:12px;right:12px;z-index:9999;background:rgba(255,248,231,0.96);border:2px solid #f0b000;border-radius:14px;padding:8px 14px;font-size:12px;font-family:sans-serif;color:#8a5a00;box-shadow:2px 3px 0 rgba(0,0,0,0.12);transition:opacity .6s;';
-            document.body.appendChild(bar);
-          }
-          if (msg.type === 'precache-done') {
-            bar.innerHTML = '✅ 离线资源 ' + msg.total + ' 个全部缓存完成';
-            setTimeout(() => { bar.style.opacity = '0'; setTimeout(() => bar.remove(), 800); }, 2500);
+        if (!msg.type || !msg.type.startsWith('precache-')) return;
+        let bar = document.getElementById('precache-indicator');
+        if (!bar) {
+          bar = document.createElement('div');
+          bar.id = 'precache-indicator';
+          bar.style.cssText = 'position:fixed;bottom:12px;right:12px;z-index:9999;background:rgba(255,248,231,0.96);border:2px solid #f0b000;border-radius:14px;padding:8px 14px;font-size:12px;font-family:sans-serif;color:#8a5a00;box-shadow:2px 3px 0 rgba(0,0,0,0.12);transition:opacity .6s;max-width:70%;line-height:1.4;';
+          document.body.appendChild(bar);
+        }
+        if (msg.type === 'precache-progress') {
+          const pct = msg.total ? Math.floor(msg.done / msg.total * 100) : 0;
+          const failTag = msg.failed > 0 ? ` ⚠️ ${msg.failed} 失败` : '';
+          bar.innerHTML = '📥 离线下载中 ' + pct + '% (' + msg.done + '/' + msg.total + ')' + failTag;
+        } else if (msg.type === 'precache-retry') {
+          bar.innerHTML = '🔁 第 ' + msg.round + ' 次重试(' + msg.count + ' 个失败项)';
+        } else if (msg.type === 'precache-done') {
+          if (msg.failed > 0) {
+            bar.innerHTML = '⚠️ 下载完成 ' + msg.cached + '/' + msg.total + '(' + msg.failed + ' 个失败,点击重试)';
+            bar.style.borderColor = '#dd4400';
+            bar.style.color = '#aa2200';
+            bar.style.cursor = 'pointer';
+            bar.onclick = () => {
+              if (navigator.serviceWorker.controller) {
+                navigator.serviceWorker.controller.postMessage({ type: 'precache-retry-manual' });
+              }
+            };
           } else {
-            const pct = msg.total ? Math.floor(msg.done / msg.total * 100) : 0;
-            bar.innerHTML = '📥 离线下载中 ' + pct + '% (' + msg.done + '/' + msg.total + ')';
+            bar.innerHTML = '✅ ' + msg.total + ' 个离线资源全部就绪';
+            setTimeout(() => { bar.style.opacity = '0'; setTimeout(() => bar.remove(), 800); }, 2500);
           }
         }
       });

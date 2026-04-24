@@ -2941,6 +2941,70 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
   80%      { transform: translateX(6px); }
 }
 
+/* ============================================================
+ * 🎤 口语练习 Voice Practice Panel
+ * ============================================================ */
+.voice-backdrop {
+  background: rgba(255, 240, 215, 0.85);
+  backdrop-filter: blur(4px);
+}
+.voice-panel {
+  max-width: 560px !important;
+  width: calc(100% - 32px);
+  padding: 28px 24px !important;
+  text-align: center;
+  animation: popquiz-bounce 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+}
+.voice-title {
+  font-family: var(--font-zh-title);
+  font-size: 1.6rem;
+  color: #a03;
+  margin-bottom: 12px;
+}
+.voice-word {
+  font-family: var(--font-en);
+  font-weight: 900;
+  font-size: 2.8rem;
+  color: var(--ink);
+  margin: 12px 0 4px;
+}
+.voice-zh {
+  font-size: 1.2rem;
+  color: var(--ink-light);
+  margin-bottom: 4px;
+}
+.voice-ipa {
+  font-family: monospace;
+  color: var(--ink-light);
+  margin-bottom: 18px;
+}
+.voice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin: 20px 0 16px;
+}
+.voice-rec-btn {
+  position: relative;
+}
+.voice-rec-btn.recording {
+  background: #ff3040 !important;
+  color: #fff !important;
+  animation: vp-pulse 0.8s infinite;
+}
+@keyframes vp-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 48, 64, 0.6), 4px 4px 0 var(--ink); }
+  50%      { box-shadow: 0 0 0 12px rgba(255, 48, 64, 0), 4px 4px 0 var(--ink); }
+}
+.voice-footer {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+
 /* Phonic 视觉提示 (silent 字母 dim / 长元音 glow / 双字母 link) */
 .pq-big-letter.pq-silent {
   opacity: 0.3;

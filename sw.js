@@ -14,7 +14,7 @@
  *   中间网挂也没事,下次打开接着下
  * ============================================================ */
 
-const VERSION = '20260422m';
+const VERSION = '20260423a';
 const CACHE_NAME = `englishkids-${VERSION}`;
 
 // 核心文件(小,一定要下,install 阻塞直到完成)
@@ -55,30 +55,63 @@ self.addEventListener('activate', (event) => {
 });
 
 // ─── Eager precache:后台下全部 audio + images ────────────────
+// 失败重试 2 次,最后漏的会广播出去,UI 可提示 "retry"
 async function precacheMedia(cache) {
   const urls = await buildMediaUrlList();
   broadcast({ type: 'precache-start', total: urls.length });
 
-  // 并发 15,分批避免 overload
   const BATCH = 15;
+  const MAX_RETRY = 2;
+  const failed = new Set();
   let done = 0;
+
+  // 尝试抓一个 URL,返回 true/false(成功与否)
+  async function tryFetch(url) {
+    try {
+      const req = new Request(url);
+      if (await cache.match(req)) return true;
+      const resp = await fetch(url, { mode: 'same-origin' });
+      if (resp.ok && resp.status === 200) {
+        await cache.put(req, resp);
+        return true;
+      }
+    } catch (e) { /* swallow */ }
+    return false;
+  }
+
+  // 第一轮
   for (let i = 0; i < urls.length; i += BATCH) {
     const batch = urls.slice(i, i + BATCH);
     await Promise.allSettled(batch.map(async (url) => {
-      try {
-        const req = new Request(url);
-        if (await cache.match(req)) { done++; return; }
-        // 强制不带 Range 的完整 fetch,避免 206
-        const resp = await fetch(url, { mode: 'same-origin' });
-        if (resp.ok && resp.status === 200) {
-          await cache.put(req, resp);
-        }
-      } catch (e) { /* 单个失败不影响整体 */ }
+      const ok = await tryFetch(url);
+      if (!ok) failed.add(url);
       done++;
     }));
-    broadcast({ type: 'precache-progress', done, total: urls.length });
+    broadcast({ type: 'precache-progress', done, total: urls.length, failed: failed.size });
   }
-  broadcast({ type: 'precache-done', total: urls.length });
+
+  // 重试轮(失败 URL 指数退避,最多 MAX_RETRY 次)
+  for (let retry = 1; retry <= MAX_RETRY && failed.size; retry++) {
+    broadcast({ type: 'precache-retry', round: retry, count: failed.size });
+    const toRetry = Array.from(failed);
+    failed.clear();
+    await new Promise(r => setTimeout(r, 800 * retry));
+    for (let i = 0; i < toRetry.length; i += BATCH) {
+      const batch = toRetry.slice(i, i + BATCH);
+      await Promise.allSettled(batch.map(async (url) => {
+        const ok = await tryFetch(url);
+        if (!ok) failed.add(url);
+      }));
+    }
+  }
+
+  broadcast({
+    type: 'precache-done',
+    total: urls.length,
+    cached: urls.length - failed.size,
+    failed: failed.size,
+    failedList: Array.from(failed).slice(0, 20),
+  });
 }
 
 async function buildMediaUrlList() {
@@ -121,6 +154,12 @@ async function buildMediaUrlList() {
 function broadcast(msg) {
   self.clients.matchAll().then(clients => clients.forEach(c => c.postMessage(msg)));
 }
+
+// 客户端发来手动重试请求(点击失败徽章时)
+self.addEventListener('message', (event) => {
+  if (!event.data || event.data.type !== 'precache-retry-manual') return;
+  caches.open(CACHE_NAME).then(cache => precacheMedia(cache));
+});
 
 // ─── 运行时 fetch handler ────────────────────────────────────
 self.addEventListener('fetch', (event) => {
