@@ -1939,6 +1939,132 @@ const QUIZ_PAPERS = {
                 { emoji:'🍒🍒',             label:'cherries' },
               ], correct:0 },
           ]},
+
+        /* —— 二、听录音排序(5 图)· 答案 4-3-5-1-2 —— */
+        { id:2, type:'listen-order',
+          title:'二、听录音,根据所听内容用数字给下列图片排序(听两遍)',
+          titleEn:'Listen and order',
+          hint:'听 5 段对话 → 点图下数字 1-5 标顺序',
+          pointsPerItem:2,
+          items:[{
+            id:'R2_01',
+            sequence:[
+              { audioText:'Look at the kites! They are colourful.' },
+              { audioText:'I like puppies. Me too.' },
+              { audioText:'Onions? Yes, please. I like onions.' },
+              { audioText:'Is this your peas? Yes. Thank you.' },
+              { audioText:'Grapes? No, thanks.' },
+            ],
+            images:[
+              { image:'vocab:u3_pea',   correctOrder:4 },  // 图 1 · 对应对话 4 (peas)
+              { image:'vocab:u3_onion', correctOrder:3 },  // 图 2 · 对应对话 3 (onions)
+              { image:'emoji:🍇',        correctOrder:5 },  // 图 3 · 对应对话 5 (grapes 拒绝)
+              { image:'vocab:u4_kite',  correctOrder:1 },  // 图 4 · 对应对话 1 (kites)
+              { image:'emoji:🐕',        correctOrder:2 },  // 图 5 · 对应对话 2 (puppies)
+            ],
+          }],
+        },
+
+        /* —— 三、听录音判断图片 T/F(5 题)· 答案 × √ × √ √ —— */
+        { id:3, type:'listen-judge',
+          title:'三、听录音,判断下列图片是(√)否(×)与所听内容相符(听两遍)',
+          titleEn:'Listen and judge',
+          hint:'听 → 看图 → 相符 ✓ 不符 ✗',
+          pointsPerItem:2,
+          items:[
+            { id:'R3_01', audio:'',
+              audioText:'I like peas. Me too.',
+              image:'vocab:u4_flower',    correct:false },   // 图花,听豌豆
+            { id:'R3_02', audio:'',
+              audioText:'Cherries? Yes, please. I like cherries.',
+              image:'emoji:🍒',           correct:true },
+            { id:'R3_03', audio:'',
+              audioText:'A robot? No, thanks.',
+              image:'emoji:🤖',           correct:false },   // 图机器人 + 对话拒绝 = 不符(按真卷答案)
+            { id:'R3_04', audio:'',
+              audioText:'Look at the flowers. They are happy.',
+              image:'vocab:u4_flower',    correct:true },
+            { id:'R3_05', audio:'',
+              audioText:"Is this a bird? No. It's a kite.",
+              image:'vocab:u4_kite',      correct:true },    // 图风筝,对话确认风筝
+          ],
+        },
+
+        /* —— 五、听录音选答句(5 题 A/B)· 答案 A B A A B —— */
+        { id:5, type:'listen-response',
+          title:'五、听录音,根据所听内容选择合适的答语(听两遍)',
+          titleEn:'Listen and choose response',
+          hint:'听 → 选最合适的英文答句',
+          pointsPerItem:2,
+          items:[
+            { id:'R5_01', audio:'', audioText:'I like onions.',
+              options:['Me too.',            'Three onions.'],        correct:0 },
+            { id:'R5_02', audio:'', audioText:'Look at my coat.',
+              options:['They are great.',    'It is beautiful.'],     correct:1 },
+            { id:'R5_03', audio:'', audioText:'Peppers?',
+              options:['Yes, please.',       'Three grapes.'],        correct:0 },
+            { id:'R5_04', audio:'', audioText:'Is this your kite?',
+              options:['Yes.',               'Great!'],               correct:0 },
+            { id:'R5_05', audio:'', audioText:'How many trees?',
+              options:['Green trees.',       'Four trees.'],          correct:1 },
+          ],
+        },
+
+        /* —— 笔试二、选不同类(5 题 3 选 1)· 答案 C B C A B —— */
+        { id:8, type:'odd-one-out',
+          title:'选出下列每组单词中与其他不属于同一类的一项',
+          titleEn:'Find the odd one out',
+          hint:'A B C 三个词,选最不像的那个',
+          pointsPerItem:1,
+          items:[
+            { id:'W2_01', items:['like','look','please'],     correct:2, note:'like/look 动作,please 礼貌词' },
+            { id:'W2_02', items:['pea','banana','pepper'],    correct:1, note:'pea/pepper 蔬菜,banana 水果' },
+            { id:'W2_03', items:['red','green','spring'],     correct:2, note:'red/green 颜色,spring 季节' },
+            { id:'W2_04', items:['ruler','tree','flower'],    correct:0, note:'tree/flower 自然物,ruler 学习用品' },
+            { id:'W2_05', items:['nice','kite','happy'],      correct:1, note:'nice/happy 形容词,kite 名词' },
+          ],
+        },
+
+        /* —— 笔试四、情景选择(5 题 A/B)· 答案 B A A B A —— */
+        { id:10, type:'scenario',
+          title:'根据所给情境,选择合适的英文表达',
+          titleEn:'Pick the right response',
+          hint:'看中文场景 → 选合适的英文',
+          pointsPerItem:1,
+          items:[
+            { id:'W4_01', scene:'你想吃一根胡萝卜,可以和妈妈说:',
+              options:['A carrot?',          'A carrot, please.'],            correct:1 },
+            { id:'W4_02', scene:'你想问爸爸买几个甜椒,可以说:',
+              options:['How many peppers?',  'Peppers?'],                     correct:0 },
+            { id:'W4_03', scene:'爸爸问你是否要出去放风筝,你可以回答:',
+              options:['Yes. I like it.',    "No. I like it."],               correct:0 },
+            { id:'W4_04', scene:'妈妈买了一束花,你可以说:',
+              options:['They are happy.',    'They are beautiful.'],          correct:1 },
+            { id:'W4_05', scene:'你向同学展示你的弹珠,可以说:',
+              options:['Look at my marble.', 'Look! Is this my marble?'],     correct:0 },
+          ],
+        },
+
+        /* —— 笔试五、判断图片与对话是否相符(5 题 ☺/☹)· 答案 ☺ ☹ ☺ ☹ ☺ —— */
+        { id:11, type:'pic-judge',
+          title:'判断下列图片是(☺)否(☹)与对话内容相符',
+          titleEn:'Picture vs dialog',
+          hint:'看图 + 读对话 → 相符 ✓ 不符 ✗',
+          pointsPerItem:2,
+          items:[
+            { id:'W5_01', image:'vocab:u3_pea',
+              text:"— Peas, Liu Tao?  — Yes. I like them.",   correct:true },
+            { id:'W5_02', image:'vocab:u4_bird',
+              text:"— I like birds.  — Me too.",              correct:false },   // 图是气球,不是鸟(按真卷答案 ☹)
+            { id:'W5_03', image:'vocab:u4_tree',
+              text:"— Look at the trees!  — They are happy.", correct:true },
+            { id:'W5_04', image:'vocab:u4_kite',
+              text:"— Is this your kite?  — No.",             correct:false },   // 图男孩手里不是风筝(按真卷答案 ☹)
+            { id:'W5_05', image:'vocab:u3_pepper',
+              text:"— How many peppers?  — Four.",            correct:true },
+          ],
+        },
+
       ],
     },
 

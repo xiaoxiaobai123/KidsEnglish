@@ -2918,7 +2918,7 @@
       row.appendChild(h('div', { class: 'quiz-item__num' }, String(idx + 1)));
       const prompt = h('div', { class: 'quiz-item__prompt' });
       const audioBtn = h('button', { class: 'q-audio-btn' }, '🔊');
-      audioBtn.addEventListener('click', (e) => { e.stopPropagation(); playQuizAudio(item.audio, audioBtn); });
+      audioBtn.addEventListener('click', (e) => { e.stopPropagation(); playQuizAudio(item.audio, audioBtn, item.audioText, { rate: 0.85 }); });
       prompt.appendChild(audioBtn);
       row.appendChild(prompt);
       row.appendChild(buildChoiceButtons(item, item.options, null, opts));
@@ -2934,7 +2934,7 @@
 
       const prompt = h('div', { class: 'quiz-item__prompt' });
       const audioBtn = h('button', { class: 'q-audio-btn' }, '🔊');
-      audioBtn.addEventListener('click', (e) => { e.stopPropagation(); playQuizAudio(item.audio, audioBtn); });
+      audioBtn.addEventListener('click', (e) => { e.stopPropagation(); playQuizAudio(item.audio, audioBtn, item.audioText, { rate: 0.85 }); });
       prompt.appendChild(audioBtn);
 
       const imgUrl = resolveQuizAsset(item.image, 'image');
@@ -3354,44 +3354,64 @@
     if (!item) return;
     const userAns = section.userAnswers[item.id] = section.userAnswers[item.id] || {};
 
+    const count = item.sequence.length;    // 动态支持 5/6 图(真卷 5,默认 6)
+
     if (!opts.review) {
       // 紧凑控制条(不用 .quiz-item 大卡片,省 ~40px 给图片)
       const topRow = h('div', { class: 'q-order-controls' });
-      const playAllBtn = h('button', { class: 'btn btn--sm btn--pink' }, '▶️ 顺序播 6 句');
+      const playAllBtn = h('button', { class: 'btn btn--sm btn--pink' }, '▶️ 顺序播 ' + count + ' 句');
       playAllBtn.addEventListener('click', async () => {
         playAllBtn.disabled = true;
-        for (const ref of item.sequence) {
+        for (const seq of item.sequence) {
+          // sequence 元素支持 string (ref) 或 object {ref, audioText}
+          const ref  = typeof seq === 'string' ? seq : seq.ref;
+          const text = (typeof seq === 'object' && seq) ? seq.audioText : null;
           await new Promise(res => {
-            const url = resolveQuizAsset(ref, 'audio');
-            if (!url) { res(); return; }
+            const url = ref ? resolveQuizAsset(ref, 'audio') : null;
             stopCurrent();
-            const a = new Audio(url);
-            a.playbackRate = 0.85;
-            currentAudio = a;
-            a.onended = a.onerror = () => { if (currentAudio === a) currentAudio = null; res(); };
-            a.play().catch(res);
+            const playTTS = () => { if (text) speakTTS(text, { rate: 0.85 }).then(res); else res(); };
+            if (!url) { playTTS(); return; }
+            // 先 HEAD 探测,404 退 TTS
+            fetch(url, { method: 'HEAD' }).then(r2 => {
+              if (!r2.ok) throw 0;
+              const a = new Audio(url);
+              a.playbackRate = 0.85;
+              currentAudio = a;
+              a.onended = a.onerror = () => { if (currentAudio === a) currentAudio = null; res(); };
+              a.play().catch(() => playTTS());
+            }).catch(() => playTTS());
           });
           await new Promise(r => setTimeout(r, 1500));
         }
         playAllBtn.disabled = false;
       });
-      const hint = h('span', { class: 'q-order-hint' }, '点数字给图片排序 · 1 最早,6 最晚');
+      const hint = h('span', { class: 'q-order-hint' }, '点数字给图片排序 · 1 最早,' + count + ' 最晚');
       topRow.append(playAllBtn, hint);
       body.appendChild(topRow);
     }
 
     const grid = h('div', { class: 'q-order-grid' });
-    item.images.forEach((imgRef, imgIdx) => {
+    item.images.forEach((img, imgIdx) => {
+      // 支持两种 image 格式:
+      //   string: 'vocab:xxx' / 'emoji:🐦' (老数据结构 · 正确序通过 sequence.indexOf 推)
+      //   object: { image:'...', correctOrder:N } (真卷 · 直接指定正确序,对 emoji/TTS 友好)
+      const imgRef = typeof img === 'string' ? img : img.image;
+      const explicitOrder = (typeof img === 'object' && img) ? img.correctOrder : null;
       const cell = h('div', { class: 'q-order-cell' });
-      const imgUrl = resolveQuizAsset(imgRef, 'image');
-      if (imgUrl) cell.appendChild(h('img', { src: imgUrl, loading: 'lazy' }));
+      // emoji 兜底 (ref 开头 'emoji:🐦')
+      if (typeof imgRef === 'string' && imgRef.startsWith('emoji:')) {
+        cell.appendChild(h('div', { class: 'q-order-emoji' }, imgRef.slice(6)));
+      } else {
+        const imgUrl = resolveQuizAsset(imgRef, 'image');
+        if (imgUrl) cell.appendChild(h('img', { src: imgUrl, loading: 'lazy' }));
+      }
       const nums = h('div', { class: 'q-order-nums' });
-      for (let n = 1; n <= 6; n++) {
+      for (let n = 1; n <= count; n++) {
         const nb = h('button', { class: 'q-order-num' }, String(n));
         if (userAns[imgIdx] === n) nb.classList.add('selected');
         if (opts.review) {
           nb.disabled = true;
-          const expected = item.sequence.indexOf(imgRef) + 1;
+          const expected = explicitOrder != null ? explicitOrder : (item.sequence.indexOf(imgRef) + 1);
           if (userAns[imgIdx] === n) {
             if (n === expected) nb.classList.add('correct');
             else nb.classList.add('wrong');

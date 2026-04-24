@@ -3465,6 +3465,16 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
   display: block;
   background: var(--cream);
 }
+.q-order-emoji {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  background: var(--cream);
+  border-radius: var(--r-sm);
+}
 .q-order-nums {
   display: flex;
   gap: 4px;
