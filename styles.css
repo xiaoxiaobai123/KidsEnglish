@@ -3363,7 +3363,8 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
 }
 .q-order-cell img {
   width: 100%;
-  aspect-ratio: 16/10;
+  /* 固定高度 · 让 6 图 3x2 排列时不触发滚动 */
+  height: 110px;
   object-fit: cover;
   border-radius: var(--r-sm);
   display: block;
@@ -3371,18 +3372,18 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
 }
 .q-order-nums {
   display: flex;
-  gap: 4px;
+  gap: 3px;
   justify-content: center;
 }
 .q-order-num {
-  width: 28px; height: 28px;
+  width: 24px; height: 24px;
   border: 2px solid var(--ink);
   border-radius: 50%;
   background: var(--cream);
   font-family: var(--font-en);
   font-weight: 700;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
 }
 .q-order-num.selected { background: var(--pink); color: var(--white); }
 .q-order-num.correct  { background: var(--success); color: var(--white); }

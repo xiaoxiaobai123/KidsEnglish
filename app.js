@@ -2753,7 +2753,7 @@
   //   没 MP3 或加载失败 → 退回 TTS 念 fallbackText
   //   fallbackText 不传就从 ref 提字（vocab:u4_tree → "tree"）
   //   关键：已经进入 MP3 播放通道后 error 不再 fallback，避免 MP3 + TTS 同时叠声
-  function playQuizAudio(ref, btn, fallbackText) {
+  function playQuizAudio(ref, btn, fallbackText, opts = {}) {
     const url = resolveQuizAsset(ref, 'audio');
     if (btn) btn.classList.add('playing');
     const doneBtn = () => { if (btn) btn.classList.remove('playing'); };
@@ -2766,7 +2766,7 @@
 
     const ttsFallback = () => {
       if (!ttsText) { doneBtn(); return; }
-      speakTTS(ttsText).then(doneBtn);
+      speakTTS(ttsText, { rate: opts.rate }).then(doneBtn);
     };
 
     if (!url) { ttsFallback(); return; }
@@ -2778,6 +2778,7 @@
     fetch(url, { method: 'HEAD' }).then(res => {
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const a = new Audio(url);
+      if (opts.rate) a.playbackRate = opts.rate;
       currentAudio = a;
       let playing = false;
       a.onended = () => { doneBtn(); if (currentAudio === a) currentAudio = null; };
@@ -3255,7 +3256,8 @@
     const audioRow = h('div', { class: 'quiz-item', style: 'justify-content: center;' });
     const bigBtn = h('button', { class: 'btn btn--lg btn--pink' }, '🔊 播放整段对话');
     bigBtn.addEventListener('click', () => {
-      playQuizAudio(item.audio, bigBtn, item.audioText);
+      // 对话偏长,放慢让孩子有反应时间
+      playQuizAudio(item.audio, bigBtn, item.audioText, { rate: 0.85 });
     });
     audioRow.appendChild(bigBtn);
     body.appendChild(audioRow);
@@ -3284,11 +3286,12 @@
             if (!url) { res(); return; }
             stopCurrent();
             const a = new Audio(url);
+            a.playbackRate = 0.85;          // 放慢 · 小孩子来得及对照图
             currentAudio = a;
             a.onended = a.onerror = () => { if (currentAudio === a) currentAudio = null; res(); };
             a.play().catch(res);
           });
-          await new Promise(r => setTimeout(r, 500));
+          await new Promise(r => setTimeout(r, 1500));  // 500 → 1500ms 给吸收/标号时间
         }
         playAllBtn.disabled = false;
       });
