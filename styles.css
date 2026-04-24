@@ -3,8 +3,7 @@
  * 视觉系统：糖果粉蓝 + 4px 粗描边 + 6px 偏移阴影 + 全套动画
  * ============================================================================ */
 
-/* ========== 字体（font.im 中国可访问镜像，海外也支持） ========== */
-@import url('https://fonts.font.im/css2?family=Fredoka:wght@400;500;600;700&family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@400;500;700&display=swap');
+/* ========== 字体改为 index.html 里异步 link 加载 · 不再 @import 阻塞 ========== */
 
 /* ========== CSS 变量 ========== */
 :root {
