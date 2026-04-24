@@ -1034,24 +1034,36 @@
     main.innerHTML = '';
     const s = LESSON.sentences[LESSON.sentenceIdx];
 
-    // 跟一跟专属录音状态(每次重置)
+    // 跟一跟专属录音 + 识别状态(每次重置)
     let followMediaRecorder = null;
     let followBlob = null;
     let followUrl = null;
     let followStream = null;
     let followChunks = [];
     let followStartMs = 0;
+    let followRec = null;        // Web Speech Recognition
+    let followRecDone = false;   // 识别已经返回了结果
 
     main.appendChild(buildSentenceNav());
     main.appendChild(h('div', { class: 'mascot' }, '🗣️'));
 
-    const sentEl = h('div', { class: 'sentence-display' }, s.en);
+    // 句子:按词拆 span,用于识别结果的颜色反馈
+    const sentEl = h('div', { class: 'sentence-display sentence-follow' });
+    const wordsArr = s.en.split(/\s+/).filter(Boolean);
+    wordsArr.forEach((w, i) => {
+      sentEl.appendChild(h('span', { class: 'follow-word', 'data-w': i }, w));
+      if (i < wordsArr.length - 1) sentEl.appendChild(document.createTextNode(' '));
+    });
     main.appendChild(sentEl);
     main.appendChild(h('div', { class: 'sentence-zh' }, s.zh));
 
     // 状态行 + 按钮(简化版 3 大按钮 + 2 辅助)
     const statusEl = h('div', { class: 'follow-status' }, '👆 先听老师读,再按麦克风跟读');
     main.appendChild(statusEl);
+
+    // 识别打分结果区(默认隐藏)
+    const resultBox = h('div', { class: 'follow-result' });
+    main.appendChild(resultBox);
 
     const primaryRow = h('div', { class: 'flex gap-md justify-center', style: 'margin-top: 14px; flex-wrap: wrap;' });
     const teacherBtn = h('button', { class: 'btn btn--lg btn--mint' }, '🔊 听老师');
@@ -1081,6 +1093,11 @@
       try {
         followStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         followChunks = [];
+        followRecDone = false;
+        // 清空上一轮的颜色高亮
+        sentEl.querySelectorAll('.follow-word').forEach(sp => sp.classList.remove('ok', 'close', 'miss'));
+        resultBox.innerHTML = '';
+
         let mt = '';
         for (const t of ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg']) {
           if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) { mt = t; break; }
@@ -1098,21 +1115,54 @@
           if (followBlob.size >= 200) {
             myBtn.disabled = false;
             compareBtn.disabled = false;
-            statusEl.textContent = '🎉 录了 ' + (durMs / 1000).toFixed(1) + '秒 · 自动回放中...';
-            statusEl.style.color = '#090';
-            setTimeout(() => playMyVoice(() => {
-              statusEl.textContent = '✅ 听到自己的了吗?按 👂 跟老师比,或重录一次';
-            }), 200);
+            // 未识别出结果时才显示自动回放
+            if (!followRecDone) {
+              statusEl.textContent = '🎉 录了 ' + (durMs / 1000).toFixed(1) + '秒 · 自动回放中...';
+              statusEl.style.color = '#090';
+              setTimeout(() => playMyVoice(() => {
+                statusEl.textContent = '✅ 听到自己的了吗?按 👂 跟老师比,或重录';
+              }), 200);
+            }
           } else {
             statusEl.textContent = '⚠️ 没录到声音(' + followBlob.size + 'B) · 检查麦克风权限';
             statusEl.style.color = '#c40';
           }
         };
+
+        // 并行启动 Web Speech Recognition 做评分(浏览器支持则用)
+        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRec) {
+          followRec = new SpeechRec();
+          followRec.lang = 'en-US';
+          followRec.continuous = false;
+          followRec.interimResults = false;
+          followRec.maxAlternatives = 3;
+          followRec.onresult = (ev) => {
+            followRecDone = true;
+            const alts = Array.from(ev.results[0]).map(r => r.transcript);
+            let best = { score: 0, results: [], heard: '' };
+            alts.forEach(alt => {
+              const r = scoreTranscript(alt, s.en);
+              if (r.score > best.score) best = r;
+            });
+            showFollowResult(best, s, sentEl, resultBox);
+            statusEl.textContent = '🎯 识别到: "' + best.heard + '" · 得分 ' + best.score;
+            statusEl.style.color = best.score >= 85 ? '#090' : best.score >= 60 ? '#06a' : '#c80';
+            // 自动停止录音(识别已经说完,不再等用户)
+            try { if (followMediaRecorder?.state === 'recording') followMediaRecorder.stop(); } catch(e){}
+          };
+          followRec.onerror = (ev) => {
+            // aborted / no-speech 常见 · 静默处理,让用户走手动流程
+            console.warn('[Speech] ' + ev.error);
+          };
+          try { followRec.start(); } catch(e) { /* continue with recording only */ }
+        }
+
         followMediaRecorder.start(200);
         followStartMs = Date.now();
         recBtn.textContent = '⏹ 停止';
         recBtn.classList.add('recording');
-        statusEl.textContent = '🔴 录音中... 读 "' + s.en + '" 完按停止';
+        statusEl.textContent = '🔴 录音中... 读 "' + s.en + '" 说完按停止(或自动识别)';
         statusEl.style.color = '#c03';
       } catch (e) {
         alert('无法访问麦克风 · 请授权\n\n' + (e.message || e.name || ''));
@@ -1136,8 +1186,13 @@
     }
 
     recBtn.addEventListener('click', () => {
-      if (followMediaRecorder && followMediaRecorder.state === 'recording') followMediaRecorder.stop();
-      else startRec();
+      if (followMediaRecorder && followMediaRecorder.state === 'recording') {
+        // 手动停录 · 也取消并行识别
+        try { if (followRec) followRec.abort(); } catch(e){}
+        followMediaRecorder.stop();
+      } else {
+        startRec();
+      }
     });
 
     myBtn.addEventListener('click', () => {
