@@ -880,6 +880,8 @@
       const info = STAGE_INFO[nextStageKey];
       const main = $('#lesson-main');
       if (!main) { resolve(); return; }
+      // 先藏起 coach 气泡,避免 fixed 定位盖住"立即开始"按钮
+      hideCoach();
       main.innerHTML = '';
       let count = 3;
       const bigIcon = h('div', { style: 'font-size: 6rem; text-align: center; margin: 20px 0;' }, info.icon);
@@ -4141,19 +4143,29 @@
           if (recStream) { recStream.getTracks().forEach(t => t.stop()); recStream = null; }
           recBtn.textContent = '🎤 重录';
           recBtn.classList.remove('recording');
-          // 只要 blob 不是 0 字节,就允许回放 —— 让孩子自己判断
           if (recordedBlob.size >= 200) {
             playBtn.disabled = false;
             compareBtn.disabled = false;
-            if (durMs < 300) {
-              statusEl.textContent = '⚠️ 录了 ' + (durMs / 1000).toFixed(1) + '秒 · 有点短,听听效果';
-              statusEl.style.color = '#c80';
-            } else {
-              statusEl.textContent = '🎉 录了 ' + (durMs / 1000).toFixed(1) + '秒 · 点下面听听';
-              statusEl.style.color = '#090';
-            }
+            statusEl.textContent = '🎉 录了 ' + (durMs / 1000).toFixed(1) + '秒 · 自动回放中...';
+            statusEl.style.color = '#090';
+            // 立即自动回放一次 · 孩子一定能听到自己声音
+            setTimeout(() => {
+              if (playbackAudio) { try { playbackAudio.pause(); } catch(e){} }
+              playbackAudio = new Audio(recordedUrl);
+              playbackAudio.onended = () => {
+                statusEl.textContent = '✅ 听到自己的了吗?再点 "🔊 听我的" 可重播 / "👂 对比听" 跟老师比';
+              };
+              playbackAudio.onerror = () => {
+                statusEl.textContent = '⚠️ 播放失败 · 点 "🔊 听我的" 再试一次';
+                statusEl.style.color = '#c40';
+              };
+              playbackAudio.play().catch(e => {
+                statusEl.textContent = '⚠️ 自动播放被浏览器拦截 · 请手动点 "🔊 听我的"';
+                statusEl.style.color = '#c80';
+              });
+            }, 200);
           } else {
-            statusEl.textContent = '⚠️ 完全没录到声音 · 请检查麦克风或重试';
+            statusEl.textContent = '⚠️ 完全没录到声音(' + recordedBlob.size + 'B)· 请检查麦克风权限';
             statusEl.style.color = '#c40';
             playBtn.disabled = true;
             compareBtn.disabled = true;
