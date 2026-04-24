@@ -4435,26 +4435,9 @@
 
   // 触发点 1：关卡切换时 30% 概率突袭
   function maybeTriggerPopQuizOnStageBreak(callback, currentStageIdx) {
-    // Interleaving:在课程中段(关 2→3 和 3→4 过场)稳定插入单词题,
-    // 避免 block 式学习(全听、全跟、全填),让单词+句子交错练
-    let shouldFire;
-    if (currentStageIdx === 1 || currentStageIdx === 2) {
-      shouldFire = true;                    // 中段 100% 触发(interleaving 主场)
-    } else {
-      shouldFire = Math.random() < 0.3;     // 其他过场 30%(保留惊喜感)
-    }
-    if (!shouldFire) { callback(); return; }
-    // 从当前课程句子里抽一个"纯单字"词(排除 I'm sorry 这类短语)
-    const candidates = [];
-    LESSON.sentences.forEach(s => {
-      (s.slots || []).forEach(slot => {
-        const v = findVocabByEn(slot.answer);
-        if (isPureWord(v)) candidates.push(v);
-      });
-    });
-    if (candidates.length === 0) { callback(); return; }
-    const word = candidates[Math.floor(Math.random() * candidates.length)];
-    showPopQuiz(word, () => callback());
+    // 关卡过场直接进下一关,不再随机插 popquiz(用户反馈会 block 点击)
+    // popquiz 保留在主菜单"突袭挑战"独立入口 + 填空答错时自动触发两处
+    callback();
   }
 
   // 触发点 2：填空答错时立刻插(只对纯单字词触发)
