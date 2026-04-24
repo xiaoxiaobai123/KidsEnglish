@@ -793,6 +793,8 @@
   }
 
   function renderLesson() {
+    // 🔇 关卡切换时停掉所有残留音频(stageDone coach / 上一关倒计时背景等)
+    stopAllAudio();
     const screen = $('#screen-lesson');
     const idx = STAGES.indexOf(LESSON.stage);
     const info = STAGE_INFO[LESSON.stage];
@@ -909,6 +911,11 @@
         if (done) return;
         done = true;
         clearInterval(tick);
+        // 🔇 立刻打断上一关的 coach/sentence 音频 + 清空倒计时 UI,
+        //    给用户"立即"反馈,避免 100-300ms 回调延迟时视觉静止
+        stopAllAudio();
+        main.innerHTML = '';
+        main.appendChild(h('div', { style: 'text-align:center; margin-top:40px; font-size:1.2rem; color:var(--ink-light);' }, '⏳ 准备中...'));
         resolve();
       }
     });
