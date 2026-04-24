@@ -2411,33 +2411,55 @@
     const screen = $('#screen-quiz');
     screen.innerHTML = '';
     const bank = QUIZ_BANKS[unit];
+    const papers = (typeof QUIZ_PAPERS !== 'undefined' && QUIZ_PAPERS[unit]) || null;
+
     const page = h('div', { class: 'quiz-mode-picker' },
       h('h2', {}, `📝 ${bank.title}`),
-      h('p', { style: 'color: var(--ink-light);' }, '选个做题模式：'),
-      h('div', { class: 'quiz-mode-grid' },
-        (() => {
-          const c = h('div', { class: 'quiz-mode-card' },
-            h('div', { class: 'icon' }, '🎯'),
-            h('div', { class: 'name' }, '模拟考试'),
-            h('div', { class: 'desc' }, '提交前不能看答案，考完才批卷。接近真考场氛围。')
-          );
-          c.addEventListener('click', () => startQuizSession(unit, 'exam'));
-          return c;
-        })(),
-        (() => {
-          const c = h('div', { class: 'quiz-mode-card' },
-            h('div', { class: 'icon' }, '📚'),
-            h('div', { class: 'name' }, '练习模式'),
-            h('div', { class: 'desc' }, '做完每大题立刻看对错，可以重试，降低焦虑。')
-          );
-          c.addEventListener('click', () => startQuizSession(unit, 'practice'));
-          return c;
-        })()
-      ),
-      h('div', { style: 'margin-top: 24px;' },
-        h('button', { class: 'btn btn--sm', onclick: renderQuizPicker }, '‹ 换单元')
-      )
+      h('p', { style: 'color: var(--ink-light);' }, '选个做题模式:')
     );
+
+    // —— 模式卡(模拟考 + 练习) ——
+    const modeGrid = h('div', { class: 'quiz-mode-grid' });
+    const examCard = h('div', { class: 'quiz-mode-card' },
+      h('div', { class: 'icon' }, '🎯'),
+      h('div', { class: 'name' }, '模拟考试'),
+      h('div', { class: 'desc' }, '提交前不能看答案,考完才批卷。接近真考场氛围。')
+    );
+    examCard.addEventListener('click', () => startQuizSession(unit, 'exam'));
+    const practiceCard = h('div', { class: 'quiz-mode-card' },
+      h('div', { class: 'icon' }, '📚'),
+      h('div', { class: 'name' }, '练习模式'),
+      h('div', { class: 'desc' }, '做完每大题立刻看对错,可以重试,降低焦虑。')
+    );
+    practiceCard.addEventListener('click', () => startQuizSession(unit, 'practice'));
+    modeGrid.append(examCard, practiceCard);
+    page.appendChild(modeGrid);
+
+    // —— 固定卷入口(QUIZ_PAPERS 有本 unit 才显示) ——
+    if (papers && papers.length > 0) {
+      page.appendChild(h('div', {
+        style: 'margin-top: 20px; padding-top: 16px; border-top: 2px dashed var(--ink-light);'
+      },
+        h('p', { style: 'color: var(--ink-light); margin-bottom: 10px;' },
+          '📄 或选一套固定卷(题目与答案位置固定,适合严肃测试):')
+      ));
+      const paperGrid = h('div', { class: 'quiz-mode-grid' });
+      const paperIcons = ['📘','📗','📕'];
+      papers.forEach((p, i) => {
+        const card = h('div', { class: 'quiz-mode-card' },
+          h('div', { class: 'icon' }, paperIcons[i] || '📄'),
+          h('div', { class: 'name' }, p.title.replace(/^.*·\s*/, '卷 ').replace('卷 ','')),
+          h('div', { class: 'desc' }, p.subtitle || '')
+        );
+        card.addEventListener('click', () => startQuizSession(unit, 'exam', p.id));
+        paperGrid.appendChild(card);
+      });
+      page.appendChild(paperGrid);
+    }
+
+    page.appendChild(h('div', { style: 'margin-top: 24px;' },
+      h('button', { class: 'btn btn--sm', onclick: renderQuizPicker }, '‹ 换单元')
+    ));
     screen.appendChild(page);
   }
 
@@ -2448,8 +2470,11 @@
     mode: 'practice',   // 'exam' | 'practice'
   };
 
-  function startQuizSession(unit, mode) {
-    const paper = generateQuizPaper(unit);
+  function startQuizSession(unit, mode, paperId) {
+    // paperId 非空:用固定卷(QUIZ_PAPERS) · 否则从 bank 随机抽(现有行为)
+    const paper = paperId && typeof generatePaperById === 'function'
+      ? generatePaperById(unit, paperId)
+      : generateQuizPaper(unit);
     if (!paper || !paper.sections.length) {
       toast('题库准备中'); return;
     }

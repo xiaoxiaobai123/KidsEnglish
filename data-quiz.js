@@ -1506,6 +1506,421 @@ function sampleQuizItems(bank, n) {
   return shuffled.slice(0, n);
 }
 
+/* ================================================================
+ * QUIZ_PAPERS · 固定三套试卷(高质量 · 答案位置错开 · 应试+长远)
+ * --------------------------------------------------------------
+ * 结构: QUIZ_PAPERS[unit] = [paperA, paperB, paperC]
+ *   每 paper: { id, title, subtitle, sections: [...] }
+ * 和 QUIZ_BANKS 并列:
+ *   - 练习模式 → generateQuizPaper (从 bank 随机抽)
+ *   - 模拟考 → generatePaperById (固定 paper)
+ * ================================================================ */
+
+const QUIZ_PAPERS = {
+
+  /* ============ Unit 3 · I like carrots · 三套试卷 ============ */
+  3: [
+
+    /* ─────────────── 卷 A · 基础版 ─────────────── */
+    {
+      id: 'u3_paperA',
+      title: 'Unit 3 · 卷 A',
+      subtitle: '基础版 · 紧扣课本',
+      totalPoints: 100,
+      sections: [
+        { id:1, type:'listen-choose', title:'一、听录音选出所听到的内容', titleEn:'Listen and choose',
+          hint:'播放录音,选出正确的词', pointsPerItem:1, items:[
+            { id:'A1_01', audio:'vocab:u3_like',   options:['like','lick','kite'],          correct:0 },
+            { id:'A1_02', audio:'vocab:u3_carrot', options:['parrot','carrot','cabbage'],    correct:1 },
+            { id:'A1_03', audio:'vocab:u3_pea',    options:['pay','pig','pea'],              correct:2 },
+            { id:'A1_04', audio:'vocab:u3_onion',  options:['apple','onion','orange'],       correct:1 },
+            { id:'A1_05', audio:'vocab:u3_pepper', options:['pepper','paper','puppy'],       correct:0 },
+            { id:'A1_06', audio:'vocab:u1_yellow', options:['yo-yo','yummy','yellow'],       correct:2 },
+          ]},
+        { id:2, type:'listen-judge', title:'二、听录音判断听到的词/句与图片是否相符', titleEn:'Listen and judge',
+          hint:'听 → 看图 → 相符 ✓ 不符 ✗', pointsPerItem:1, items:[
+            { id:'A2_01', audio:'vocab:u3_carrot', image:'vocab:u3_carrot', correct:true  },
+            { id:'A2_02', audio:'vocab:u3_pea',    image:'vocab:u3_pea',    correct:true  },
+            { id:'A2_03', audio:'vocab:u3_onion',  image:'vocab:u3_pepper', correct:false },
+            { id:'A2_04', audio:'vocab:u3_pepper', image:'vocab:u3_pepper', correct:true  },
+            { id:'A2_05', audio:'vocab:u3_like',   image:'vocab:u3_onion',  correct:false },
+            { id:'A2_06', audio:'sent:s_u3_01',    image:'sent:s_u3_04',    correct:false },
+          ]},
+        { id:3, type:'listen-judge', title:'三、听录音判断所听句子与图片是否相符', titleEn:'Listen sentence and judge',
+          hint:'听完整句 → 看图 → 相符 ✓ 不符 ✗', pointsPerItem:1, items:[
+            { id:'A3_01', audio:'sent:s_u3_01', image:'sent:s_u3_02', correct:false },
+            { id:'A3_02', audio:'sent:s_u3_02', image:'sent:s_u3_02', correct:true  },
+            { id:'A3_03', audio:'sent:s_u3_03', image:'sent:s_u3_05', correct:false },
+            { id:'A3_04', audio:'sent:s_u3_04', image:'sent:s_u3_04', correct:true  },
+            { id:'A3_05', audio:'sent:s_u3_05', image:'sent:s_u3_05', correct:true  },
+            { id:'A3_06', audio:'sent:s_u3_07', image:'sent:s_u3_01', correct:false },
+          ]},
+        { id:4, type:'listen-order', title:'四、听录音给下列图片排序', titleEn:'Listen and order',
+          hint:'按播放顺序给图片写 1–6', pointsPerItem:12, items:[{
+            id:'A4_01',
+            sequence:['sent:s_u3_01','sent:s_u3_03','sent:s_u3_02','sent:s_u3_04','sent:s_u3_05','sent:s_u3_08'],
+            images:  ['sent:s_u3_02','sent:s_u3_04','sent:s_u3_01','sent:s_u3_03','sent:s_u3_08','sent:s_u3_05'],
+          }]},
+        { id:5, type:'listen-response', title:'五、听录音选出相应的答句', titleEn:'Listen and choose response',
+          hint:'听问句 → 选合适的英文答句', pointsPerItem:2, items:[
+            { id:'A5_01', audio:'quiz:u3q5_01', audioText:'Do you like carrots?',  options:['Yes, I do.','No, thanks.','Me too.'],                    correct:0 },
+            { id:'A5_02', audio:'quiz:u3q5_03', audioText:'A pea?',                options:['Bye.','Yes, please.','I\'m sorry.'],                     correct:1 },
+            { id:'A5_03', audio:'quiz:u3q5_05', audioText:'What colour are peas?',options:['Yellow.','Red.','Green.'],                                 correct:2 },
+            { id:'A5_04', audio:'quiz:u3q5_04', audioText:'I like peppers.',      options:['Me too.','No, thanks.','You\'re welcome.'],               correct:0 },
+            { id:'A5_05', audio:'quiz:u3q5_09', audioText:'Thank you.',           options:['Sorry.','You\'re welcome.','Me too.'],                    correct:1 },
+            { id:'A5_06', audio:'quiz:u3q5_11', audioText:'Yummy!',               options:['No.','Bye.','Me too!'],                                    correct:2 },
+          ]},
+        { id:6, type:'listen-fill', title:'六、听录音选出正确的单词填空', titleEn:'Listen and fill',
+          hint:'听 → 从词库挑合适的词填进空位', pointsPerItem:10, items:[{
+            id:'A6_01',
+            audio:'quiz:u3q6_01',
+            audioText:'I like carrots. Me too! An onion? No, thanks. A pea? Yes, please. We all like peppers.',
+            pool:['carrots','too','onion','pea','peppers','like','No','please'],
+            dialog:[
+              { speaker:'A', parts:[{t:'I like '},{blank:'carrots'},{t:'.'}] },
+              { speaker:'B', parts:[{t:'Me '},{blank:'too'},{t:'!'}] },
+              { speaker:'A', parts:[{t:'An '},{blank:'onion'},{t:'? No, thanks.'}] },
+              { speaker:'B', parts:[{t:'A '},{blank:'pea'},{t:'? Yes, please.'}] },
+              { speaker:'A', parts:[{t:'We all like '},{blank:'peppers'},{t:'.'}] },
+            ],
+          }]},
+        { id:7, type:'letter-neighbor', title:'七、写出下列字母的左邻右舍', titleEn:'Letter neighbors',
+          hint:'每个字母前后各有一个', pointsPerItem:1,
+          items:[
+            { id:'qL_Cc', letter:'Cc', before:'Bb', after:'Dd' },
+            { id:'qL_Gg', letter:'Gg', before:'Ff', after:'Hh' },
+            { id:'qL_Nn', letter:'Nn', before:'Mm', after:'Oo' },
+            { id:'qL_Tt', letter:'Tt', before:'Ss', after:'Uu' },
+          ]},
+        { id:8, type:'odd-one-out', title:'八、选出每组中不同类的一项', titleEn:'Find the odd one out',
+          hint:'四个词里选出跟其他三个不是一类的', pointsPerItem:1, items:[
+            { id:'A8_01', items:['carrot','pea','pepper','book'],      correct:3, note:'三个蔬菜,book 不是' },
+            { id:'A8_02', items:['pear','apple','banana','onion'],     correct:3, note:'三个水果,onion 是蔬菜' },
+            { id:'A8_03', items:['like','pea','eat','walk'],           correct:1, note:'三个动词,pea 是蔬菜' },
+            { id:'A8_04', items:['one','two','carrot','three'],        correct:2, note:'三个数字,carrot 不是' },
+            { id:'A8_05', items:['green','red','yellow','pea'],        correct:3, note:'三个颜色,pea 是蔬菜' },
+            { id:'A8_06', items:['pea','book','pencil','ruler'],       correct:0, note:'pea 非学习用品' },
+          ]},
+        { id:9, type:'pic-judge', title:'九、判断下列句子与图片是否相符', titleEn:'Picture vs sentence',
+          hint:'看图 + 读英文 → 相符 ✓ 不符 ✗', pointsPerItem:1, items:[
+            { id:'A9_01', image:'vocab:u3_carrot', text:"It's a carrot.",  correct:true  },
+            { id:'A9_02', image:'vocab:u3_pea',    text:"It's an onion.",  correct:false },
+            { id:'A9_03', image:'vocab:u3_pepper', text:"It's a pepper.",  correct:true  },
+            { id:'A9_04', image:'vocab:u3_onion',  text:"It's a pea.",     correct:false },
+          ]},
+        { id:10, type:'scenario', title:'十、情景选择', titleEn:'Pick the right response',
+          hint:'根据场景,选最合适的英文', pointsPerItem:1, items:[
+            { id:'A10_01', scene:'同学请你吃胡萝卜,你想吃,说:',
+              options:['Yes, please.','No, thanks.','Me too.'], correct:0 },
+            { id:'A10_02', scene:'别人让你吃洋葱,你不想吃,说:',
+              options:['Yes, please.','No, thanks.','Hi.'], correct:1 },
+            { id:'A10_03', scene:'朋友说他喜欢豌豆,你也喜欢,回答:',
+              options:["I'm sorry.",'No, thanks.','Me too.'], correct:2 },
+            { id:'A10_04', scene:'把胡萝卜递给别人,应当说:',
+              options:['Here you are.','Sorry.','Me too.'], correct:0 },
+          ]},
+        { id:11, type:'match-columns', title:'十一、从 II 栏中选出 I 栏相对应的答句', titleEn:'Match columns',
+          hint:'点左边的题 → 再点右边的答', pointsPerItem:12, items:[{
+            id:'A11_01',
+            pairs:[
+              { q:'Do you like carrots?', a:'Yes, I do.' },
+              { q:'An onion?',             a:'No, thanks.' },
+              { q:'A pea?',                a:'Yes, please.' },
+              { q:'I like peppers.',       a:'Me too.' },
+              { q:'Thank you.',            a:"You're welcome." },
+              { q:'How many peas?',        a:'Five peas.' },
+            ],
+          }]},
+        { id:12, type:'dialog-fill', title:'十二、从方框中选出正确的单词补全对话', titleEn:'Dialog fill',
+          hint:'点空位 → 从词库挑合适的词', pointsPerItem:10, items:[{
+            id:'A12_01',
+            pool:['like','carrots','Me','please','No','Yes'],
+            dialog:[
+              { speaker:'A', parts:[{t:'I '},{blank:'like'},{t:' '},{blank:'carrots'},{t:'.'}] },
+              { speaker:'B', parts:[{blank:'Me'},{t:' too!'}] },
+              { speaker:'A', parts:[{t:'An onion? '},{blank:'No'},{t:', thanks.'}] },
+              { speaker:'B', parts:[{t:'A pea? Yes, '},{blank:'please'},{t:'.'}] },
+            ],
+          }]},
+      ],
+    },
+
+    /* ─────────────── 卷 B · 中等版 ─────────────── */
+    {
+      id: 'u3_paperB',
+      title: 'Unit 3 · 卷 B',
+      subtitle: '中等版 · 干扰项加强',
+      totalPoints: 100,
+      sections: [
+        { id:1, type:'listen-choose', title:'一、听录音选出所听到的内容', titleEn:'Listen and choose',
+          hint:'播放录音,选出正确的词', pointsPerItem:1, items:[
+            { id:'B1_01', audio:'vocab:u3_carrot', options:['cat','car','carrot'],     correct:2 },
+            { id:'B1_02', audio:'vocab:u3_onion',  options:['onion','orange','open'],   correct:0 },
+            { id:'B1_03', audio:'vocab:u3_pea',    options:['pay','pea','pig'],         correct:1 },
+            { id:'B1_04', audio:'vocab:u3_pepper', options:['paper','puppy','pepper'],  correct:2 },
+            { id:'B1_05', audio:'vocab:u3_like',   options:['lick','like','lake'],      correct:1 },
+            { id:'B1_06', audio:'vocab:u3_we',     options:['we','me','see'],           correct:0 },
+          ]},
+        { id:2, type:'listen-judge', title:'二、听录音判断听到的词/句与图片是否相符', titleEn:'Listen and judge',
+          hint:'听 → 看图 → 相符 ✓ 不符 ✗', pointsPerItem:1, items:[
+            { id:'B2_01', audio:'vocab:u3_carrot', image:'vocab:u3_onion',  correct:false },
+            { id:'B2_02', audio:'vocab:u3_pea',    image:'vocab:u3_pea',    correct:true  },
+            { id:'B2_03', audio:'vocab:u3_like',   image:'vocab:u3_pepper', correct:false },
+            { id:'B2_04', audio:'sent:s_u3_01',    image:'sent:s_u3_03',    correct:false },
+            { id:'B2_05', audio:'vocab:u3_pepper', image:'vocab:u3_pepper', correct:true  },
+            { id:'B2_06', audio:'sent:s_u3_04',    image:'sent:s_u3_04',    correct:true  },
+          ]},
+        { id:3, type:'listen-judge', title:'三、听录音判断所听句子与图片是否相符', titleEn:'Listen sentence and judge',
+          hint:'听完整句 → 看图 → 相符 ✓ 不符 ✗', pointsPerItem:1, items:[
+            { id:'B3_01', audio:'sent:s_u3_02', image:'sent:s_u3_02', correct:true  },
+            { id:'B3_02', audio:'sent:s_u3_05', image:'sent:s_u3_03', correct:false },
+            { id:'B3_03', audio:'sent:s_u3_06', image:'sent:s_u3_06', correct:true  },
+            { id:'B3_04', audio:'sent:s_u3_04', image:'sent:s_u3_05', correct:false },
+            { id:'B3_05', audio:'sent:s_u3_07', image:'sent:s_u3_02', correct:false },
+            { id:'B3_06', audio:'sent:s_u3_08', image:'sent:s_u3_08', correct:true  },
+          ]},
+        { id:4, type:'listen-order', title:'四、听录音给下列图片排序', titleEn:'Listen and order',
+          hint:'按播放顺序给图片写 1–6', pointsPerItem:12, items:[{
+            id:'B4_01',
+            sequence:['sent:s_u3_02','sent:s_u3_05','sent:s_u3_01','sent:s_u3_03','sent:s_u3_04','sent:s_u3_08'],
+            images:  ['sent:s_u3_01','sent:s_u3_02','sent:s_u3_03','sent:s_u3_04','sent:s_u3_05','sent:s_u3_08'],
+          }]},
+        { id:5, type:'listen-response', title:'五、听录音选出相应的答句', titleEn:'Listen and choose response',
+          hint:'听问句 → 选合适的英文答句', pointsPerItem:2, items:[
+            { id:'B5_01', audio:'quiz:u3q5_07', audioText:'Do you like onions?',  options:['Me too.','Yes, please.',"No, I don't."], correct:2 },
+            { id:'B5_02', audio:'quiz:u3q5_02', audioText:'An onion?',            options:['Bye.','No, thanks.','Thank you.'],       correct:1 },
+            { id:'B5_03', audio:'quiz:u3q5_10', audioText:'How many peas?',       options:['Five peas.','Me too.','Thank you.'],     correct:0 },
+            { id:'B5_04', audio:'quiz:u3q5_08', audioText:'Carrots, please.',     options:['Sorry.','No.','Here you are.'],          correct:2 },
+            { id:'B5_05', audio:'quiz:u3q5_12', audioText:'I like it.',           options:['Me too.','No, thanks.','Sorry.'],        correct:0 },
+            { id:'B5_06', audio:'quiz:u3q5_06', audioText:'Are peas sweet?',      options:['No, thanks.','Yes, they are.','Hi.'],    correct:1 },
+          ]},
+        { id:6, type:'listen-fill', title:'六、听录音选出正确的单词填空', titleEn:'Listen and fill',
+          hint:'听 → 从词库挑合适的词填进空位', pointsPerItem:10, items:[{
+            id:'B6_01',
+            audio:'quiz:u3q6_02',
+            audioText:'Peas are green. They are sweet. Me too, I like them! Yummy!',
+            pool:['green','sweet','too','like','yummy','Peas'],
+            dialog:[
+              { speaker:'A', parts:[{blank:'Peas'},{t:' are '},{blank:'green'},{t:'.'}] },
+              { speaker:'B', parts:[{t:'They are '},{blank:'sweet'},{t:'.'}] },
+              { speaker:'A', parts:[{t:'Me '},{blank:'too'},{t:', I like them!'}] },
+              { speaker:'B', parts:[{blank:'yummy'},{t:'!'}] },
+            ],
+          }]},
+        { id:7, type:'letter-neighbor', title:'七、写出下列字母的左邻右舍', titleEn:'Letter neighbors',
+          hint:'每个字母前后各有一个', pointsPerItem:1,
+          items:[
+            { id:'qL_Ee', letter:'Ee', before:'Dd', after:'Ff' },
+            { id:'qL_Ll', letter:'Ll', before:'Kk', after:'Mm' },
+            { id:'qL_Qq', letter:'Qq', before:'Pp', after:'Rr' },
+            { id:'qL_Vv', letter:'Vv', before:'Uu', after:'Ww' },
+          ]},
+        { id:8, type:'odd-one-out', title:'八、选出每组中不同类的一项', titleEn:'Find the odd one out',
+          hint:'四个词里选出跟其他三个不是一类的', pointsPerItem:1, items:[
+            { id:'B8_01', items:['book','pea','pencil','ruler'],       correct:1, note:'pea 非学习用品' },
+            { id:'B8_02', items:['like','eat','walk','pepper'],        correct:3, note:'三个动词,pepper 是蔬菜' },
+            { id:'B8_03', items:['onion','carrot','bird','pea'],       correct:2, note:'三个蔬菜,bird 是动物' },
+            { id:'B8_04', items:['carrot','three','five','one'],       correct:0, note:'三个数字,carrot 不是' },
+            { id:'B8_05', items:['red','yellow','green','carrot'],     correct:3, note:'三个颜色' },
+            { id:'B8_06', items:['book','pea','eraser','ruler'],       correct:1, note:'pea 非学习用品' },
+          ]},
+        { id:9, type:'pic-judge', title:'九、判断下列句子与图片是否相符', titleEn:'Picture vs sentence',
+          hint:'看图 + 读英文 → 相符 ✓ 不符 ✗', pointsPerItem:1, items:[
+            { id:'B9_01', image:'vocab:u3_carrot', text:"It's an onion.",   correct:false },
+            { id:'B9_02', image:'vocab:u3_pepper', text:"It's a pepper.",   correct:true  },
+            { id:'B9_03', image:'vocab:u3_pea',    text:"It's an apple.",   correct:false },
+            { id:'B9_04', image:'vocab:u3_onion',  text:"It's an onion.",   correct:true  },
+          ]},
+        { id:10, type:'scenario', title:'十、情景选择', titleEn:'Pick the right response',
+          hint:'根据场景,选最合适的英文', pointsPerItem:1, items:[
+            { id:'B10_01', scene:'想让别人再给你一颗豌豆,礼貌地说:',
+              options:['Carrots, please.','A pea, please.','Bye.'], correct:1 },
+            { id:'B10_02', scene:'朋友分享胡萝卜,你也爱吃,说:',
+              options:['Me too.','Sorry.','Bye.'], correct:0 },
+            { id:'B10_03', scene:'你递给朋友一根胡萝卜,他说谢谢,你回:',
+              options:['Me too.',"You're welcome.",'No, thanks.'], correct:1 },
+            { id:'B10_04', scene:'描述豌豆又甜又绿:',
+              options:['Peas are red.','Peas are big.','Peas are sweet and green.'], correct:2 },
+          ]},
+        { id:11, type:'match-columns', title:'十一、从 II 栏中选出 I 栏相对应的答句', titleEn:'Match columns',
+          hint:'点左边的题 → 再点右边的答', pointsPerItem:12, items:[{
+            id:'B11_01',
+            pairs:[
+              { q:'I like carrots.',       a:'Me too.' },
+              { q:'A pea?',                a:'Yes, please.' },
+              { q:'An onion?',             a:'No, thanks.' },
+              { q:'Here you are.',         a:'Thank you.' },
+              { q:'How many onions?',      a:'Three onions.' },
+              { q:'Are peas sweet?',       a:'Yes, they are.' },
+            ],
+          }]},
+        { id:12, type:'dialog-fill', title:'十二、从方框中选出正确的单词补全对话', titleEn:'Dialog fill',
+          hint:'点空位 → 从词库挑合适的词', pointsPerItem:10, items:[{
+            id:'B12_01',
+            pool:['too','yummy','peas','sweet','green','Me'],
+            dialog:[
+              { speaker:'A', parts:[{t:'I like '},{blank:'peas'},{t:'. They are '},{blank:'green'},{t:'.'}] },
+              { speaker:'B', parts:[{t:'Are they '},{blank:'sweet'},{t:'?'}] },
+              { speaker:'A', parts:[{t:'Yes, so '},{blank:'yummy'},{t:'!'}] },
+              { speaker:'B', parts:[{blank:'Me'},{t:' '},{blank:'too'},{t:'!'}] },
+            ],
+          }]},
+      ],
+    },
+
+    /* ─────────────── 卷 C · 挑战版 ─────────────── */
+    {
+      id: 'u3_paperC',
+      title: 'Unit 3 · 卷 C',
+      subtitle: '挑战版 · 综合应用',
+      totalPoints: 100,
+      sections: [
+        { id:1, type:'listen-choose', title:'一、听录音选出所听到的内容', titleEn:'Listen and choose',
+          hint:'播放录音,选出正确的词', pointsPerItem:1, items:[
+            { id:'C1_01', audio:'vocab:u3_pea',    options:['pay','pea','pair'],          correct:1 },
+            { id:'C1_02', audio:'vocab:u3_pepper', options:['puppy','paper','pepper'],    correct:2 },
+            { id:'C1_03', audio:'vocab:u3_carrot', options:['carrot','parrot','cartoon'], correct:0 },
+            { id:'C1_04', audio:'vocab:u3_onion',  options:['onion','orange','apron'],    correct:0 },
+            { id:'C1_05', audio:'vocab:u3_like',   options:['kite','bike','like'],        correct:2 },
+            { id:'C1_06', audio:'vocab:u3_we',     options:['bee','we','me'],             correct:1 },
+          ]},
+        { id:2, type:'listen-judge', title:'二、听录音判断听到的词/句与图片是否相符', titleEn:'Listen and judge',
+          hint:'听 → 看图 → 相符 ✓ 不符 ✗', pointsPerItem:1, items:[
+            { id:'C2_01', audio:'vocab:u3_carrot', image:'vocab:u3_carrot', correct:true  },
+            { id:'C2_02', audio:'vocab:u3_onion',  image:'vocab:u3_pea',    correct:false },
+            { id:'C2_03', audio:'vocab:u3_pepper', image:'vocab:u3_pepper', correct:true  },
+            { id:'C2_04', audio:'sent:s_u3_03',    image:'sent:s_u3_04',    correct:false },
+            { id:'C2_05', audio:'sent:s_u3_05',    image:'sent:s_u3_05',    correct:true  },
+            { id:'C2_06', audio:'sent:s_u3_08',    image:'sent:s_u3_03',    correct:false },
+          ]},
+        { id:3, type:'listen-judge', title:'三、听录音判断所听句子与图片是否相符', titleEn:'Listen sentence and judge',
+          hint:'听完整句 → 看图 → 相符 ✓ 不符 ✗', pointsPerItem:1, items:[
+            { id:'C3_01', audio:'sent:s_u3_01', image:'sent:s_u3_04', correct:false },
+            { id:'C3_02', audio:'sent:s_u3_02', image:'sent:s_u3_02', correct:true  },
+            { id:'C3_03', audio:'sent:s_u3_06', image:'sent:s_u3_06', correct:true  },
+            { id:'C3_04', audio:'sent:s_u3_07', image:'sent:s_u3_01', correct:false },
+            { id:'C3_05', audio:'sent:s_u3_08', image:'sent:s_u3_08', correct:true  },
+            { id:'C3_06', audio:'sent:s_u3_04', image:'sent:s_u3_03', correct:false },
+          ]},
+        { id:4, type:'listen-order', title:'四、听录音给下列图片排序', titleEn:'Listen and order',
+          hint:'按播放顺序给图片写 1–6', pointsPerItem:12, items:[{
+            id:'C4_01',
+            sequence:['sent:s_u3_03','sent:s_u3_01','sent:s_u3_04','sent:s_u3_02','sent:s_u3_08','sent:s_u3_05'],
+            images:  ['sent:s_u3_05','sent:s_u3_08','sent:s_u3_01','sent:s_u3_02','sent:s_u3_03','sent:s_u3_04'],
+          }]},
+        { id:5, type:'listen-response', title:'五、听录音选出相应的答句', titleEn:'Listen and choose response',
+          hint:'听问句 → 选合适的英文答句', pointsPerItem:2, items:[
+            { id:'C5_01', audio:'quiz:u3q5_04', audioText:'I like peppers.',      options:['No.','Me too.','Bye.'],                      correct:1 },
+            { id:'C5_02', audio:'quiz:u3q5_01', audioText:'Do you like carrots?', options:['Yes, I do.','Me too.','Sorry.'],             correct:0 },
+            { id:'C5_03', audio:'quiz:u3q5_06', audioText:'Are peas sweet?',      options:['Sorry.','No, please.','Yes, they are.'],     correct:2 },
+            { id:'C5_04', audio:'quiz:u3q5_11', audioText:'Yummy!',               options:['Bye.','Me too!','Sorry.'],                   correct:1 },
+            { id:'C5_05', audio:'quiz:u3q5_08', audioText:'Carrots, please.',     options:['Look!','No, thanks.','Here you are.'],       correct:2 },
+            { id:'C5_06', audio:'quiz:u3q5_10', audioText:'How many peas?',       options:['Five peas.','Three books.','Me too.'],       correct:0 },
+          ]},
+        { id:6, type:'listen-fill', title:'六、听录音选出正确的单词填空', titleEn:'Listen and fill',
+          hint:'听 → 从词库挑合适的词填进空位', pointsPerItem:10, items:[{
+            id:'C6_01',
+            audio:'quiz:u3q6_03',
+            audioText:"Do you like peas? Yes, I do. Peas are sweet and green. Me too! I like them.",
+            pool:['peas','green','sweet','Me','too','like'],
+            dialog:[
+              { speaker:'A', parts:[{t:'Do you like '},{blank:'peas'},{t:'?'}] },
+              { speaker:'B', parts:[{t:'Yes, I do. Peas are '},{blank:'sweet'},{t:' and '},{blank:'green'},{t:'.'}] },
+              { speaker:'A', parts:[{blank:'Me'},{t:' '},{blank:'too'},{t:'!'}] },
+            ],
+          }]},
+        { id:7, type:'letter-neighbor', title:'七、写出下列字母的左邻右舍', titleEn:'Letter neighbors',
+          hint:'每个字母前后各有一个', pointsPerItem:1,
+          items:[
+            { id:'qL_Hh', letter:'Hh', before:'Gg', after:'Ii' },
+            { id:'qL_Oo', letter:'Oo', before:'Nn', after:'Pp' },
+            { id:'qL_Ss', letter:'Ss', before:'Rr', after:'Tt' },
+            { id:'qL_Yy', letter:'Yy', before:'Xx', after:'Zz' },
+          ]},
+        { id:8, type:'odd-one-out', title:'八、选出每组中不同类的一项', titleEn:'Find the odd one out',
+          hint:'四个词里选出跟其他三个不是一类的', pointsPerItem:1, items:[
+            { id:'C8_01', items:['pear','pepper','pea','carrot'],     correct:0, note:'pear 是水果,其余蔬菜' },
+            { id:'C8_02', items:['book','pea','eraser','ruler'],      correct:1, note:'pea 非学习用品' },
+            { id:'C8_03', items:['carrot','pea','onion','tree'],      correct:3, note:'tree 是植物非蔬菜' },
+            { id:'C8_04', items:['sweet','yummy','carrot','big'],     correct:2, note:'三个形容词,carrot 是名词' },
+            { id:'C8_05', items:['bird','pea','pepper','onion'],      correct:0, note:'bird 是动物' },
+            { id:'C8_06', items:['eat','like','run','pepper'],        correct:3, note:'三个动词,pepper 是蔬菜' },
+          ]},
+        { id:9, type:'pic-judge', title:'九、判断下列句子与图片是否相符', titleEn:'Picture vs sentence',
+          hint:'看图 + 读英文 → 相符 ✓ 不符 ✗', pointsPerItem:1, items:[
+            { id:'C9_01', image:'vocab:u3_pea',    text:"It's a pea.",       correct:true  },
+            { id:'C9_02', image:'vocab:u3_carrot', text:"It's a pepper.",    correct:false },
+            { id:'C9_03', image:'vocab:u3_onion',  text:"It's a carrot.",    correct:false },
+            { id:'C9_04', image:'vocab:u3_pepper', text:"It's a pepper.",    correct:true  },
+          ]},
+        { id:10, type:'scenario', title:'十、情景选择', titleEn:'Pick the right response',
+          hint:'根据场景,选最合适的英文', pointsPerItem:1, items:[
+            { id:'C10_01', scene:'朋友吃到洋葱皱眉,你想安慰:',
+              options:['Me too.','Thank you.',"That's OK."], correct:2 },
+            { id:'C10_02', scene:'把最后的胡萝卜让给朋友:',
+              options:['No, thanks.','Here you are.','Bye.'], correct:1 },
+            { id:'C10_03', scene:'建议大家一起吃甜椒:',
+              options:["Let's eat peppers.",'Me too.','No, thanks.'], correct:0 },
+            { id:'C10_04', scene:'朋友说豌豆很甜,你赞同:',
+              options:['Bye.','Yes, they are.','Sorry.'], correct:1 },
+          ]},
+        { id:11, type:'match-columns', title:'十一、从 II 栏中选出 I 栏相对应的答句', titleEn:'Match columns',
+          hint:'点左边的题 → 再点右边的答', pointsPerItem:12, items:[{
+            id:'C11_01',
+            pairs:[
+              { q:'Do you like peas?',     a:'Yes, I do.' },
+              { q:'Thank you.',            a:"You're welcome." },
+              { q:'An onion?',             a:'No, thanks.' },
+              { q:'Peas are sweet.',       a:'Me too.' },
+              { q:'Here you are.',         a:'Thank you.' },
+              { q:'How many peppers?',     a:'Six peppers.' },
+            ],
+          }]},
+        { id:12, type:'dialog-fill', title:'十二、从方框中选出正确的单词补全对话', titleEn:'Dialog fill',
+          hint:'点空位 → 从词库挑合适的词', pointsPerItem:10, items:[{
+            id:'C12_01',
+            pool:['sweet','peas','green','yummy','please','Yes'],
+            dialog:[
+              { speaker:'A', parts:[{blank:'Peas'},{t:' are '},{blank:'green'},{t:'.'}] },
+              { speaker:'B', parts:[{t:'Are they '},{blank:'sweet'},{t:'?'}] },
+              { speaker:'A', parts:[{blank:'Yes'},{t:', so '},{blank:'yummy'},{t:'!'}] },
+            ],
+          }]},
+      ],
+    },
+
+  ],
+
+};
+
+// 按 paperId 生成固定考卷(不随机抽题)
+function generatePaperById(unit, paperId) {
+  const papers = QUIZ_PAPERS[unit];
+  if (!papers) return null;
+  const paper = papers.find(p => p.id === paperId);
+  if (!paper) return null;
+  return {
+    unit,
+    title: paper.title,
+    subtitle: paper.subtitle,
+    totalPoints: paper.totalPoints || 100,
+    startedAt: Date.now(),
+    paperId,
+    sections: paper.sections.slice().sort((a, b) => a.id - b.id).map(sec => ({
+      id: sec.id,
+      type: sec.type,
+      title: sec.title,
+      titleEn: sec.titleEn,
+      hint: sec.hint,
+      pointsPerItem: sec.pointsPerItem,
+      // items 固定,不随机抽
+      items: sec.items.slice(),
+      userAnswers: {},
+      graded: false,
+    })),
+  };
+}
+
 // 生成一套考卷（按 sections 配置抽题 · 按 id 排序）
 function generateQuizPaper(unit) {
   const u = QUIZ_BANKS[unit];
@@ -1538,7 +1953,9 @@ function generateQuizPaper(unit) {
 /* ==================== 暴露 ==================== */
 if (typeof window !== 'undefined') {
   window.QUIZ_BANKS        = QUIZ_BANKS;
+  window.QUIZ_PAPERS       = QUIZ_PAPERS;
   window.resolveQuizAsset  = resolveQuizAsset;
   window.sampleQuizItems   = sampleQuizItems;
   window.generateQuizPaper = generateQuizPaper;
+  window.generatePaperById = generatePaperById;
 }

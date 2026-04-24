@@ -14,7 +14,7 @@
  *   中间网挂也没事,下次打开接着下
  * ============================================================ */
 
-const VERSION = '20260424m';
+const VERSION = '20260424n';
 const CACHE_NAME = `englishkids-${VERSION}`;
 
 // 核心文件(小,一定要下,install 阻塞直到完成)
