@@ -3353,6 +3353,119 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
 .letter-picker-btn.selected { background: var(--pink); color: var(--white); }
 
 /* 听录音排序 */
+/* ========== 真卷新题型 CSS ========== */
+
+/* listen-match-pic · 人 → 图连线 (听力四) */
+.q-match-pic-grid { display: flex; flex-direction: column; gap: 8px; }
+.q-match-pic-row {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--white); border: 2px solid var(--ink); border-radius: var(--r);
+  padding: 8px 10px; box-shadow: 2px 2px 0 var(--ink);
+}
+.q-match-pic-person {
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0; width: 130px;
+}
+.q-match-pic-face { font-size: 2rem; }
+.q-match-pic-face-img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+.q-match-pic-name { font-family: var(--font-en); font-weight: 700; font-size: 0.85rem; }
+.q-match-pic-targets { display: flex; gap: 6px; flex: 1; flex-wrap: wrap; }
+.q-match-pic-target {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 4px; min-width: 70px; min-height: 70px;
+  background: var(--cream); border: 2px solid var(--ink); border-radius: var(--r-sm);
+  cursor: pointer; font-family: inherit;
+}
+.q-match-pic-target:hover { background: var(--white); }
+.q-match-pic-target.selected { background: var(--pink); color: var(--white); }
+.q-match-pic-target.correct-answer { background: #c8f0c8; border-color: #2a7a2a; }
+.q-match-pic-target.wrong { background: #FFD6D6; border-color: #c40; }
+.q-mp-letter { font-family: var(--font-en); font-weight: 700; font-size: 0.85rem; }
+.q-mp-emoji { font-size: 1.6rem; }
+.q-mp-timg { width: 40px; height: 40px; object-fit: contain; }
+
+/* listen-fill-choose · 听对话每空 A/B 选 (听力六) */
+.q-fill-choose-dialog {
+  background: var(--white); border: 2px solid var(--ink); border-radius: var(--r);
+  padding: 14px 18px; font-family: var(--font-en); line-height: 2.4;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+.q-fill-choose-line { margin-bottom: 6px; }
+.q-fc-speaker { color: var(--pink); }
+.q-fc-chip { display: inline-flex; align-items: center; gap: 4px; margin: 0 4px; }
+.q-fc-blank-no {
+  font-family: var(--font-en); color: var(--ink-light);
+  font-size: 0.75rem;
+}
+.q-fc-opt {
+  padding: 2px 10px; border: 2px solid var(--ink); border-radius: var(--r-sm);
+  background: var(--cream); cursor: pointer; font-family: inherit; font-size: 0.9rem;
+}
+.q-fc-opt:hover { background: var(--white); }
+.q-fc-opt.selected { background: var(--pink); color: var(--white); }
+.q-fc-opt.correct-answer { background: #c8f0c8; border-color: #2a7a2a; }
+.q-fc-opt.wrong { background: #FFD6D6; border-color: #c40; }
+
+/* letter-fill · 字母表填空 (笔试一) */
+.q-letter-fill-grid { display: flex; flex-direction: column; gap: 10px; }
+.q-letter-fill-row {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--white); border: 2px solid var(--ink); border-radius: var(--r);
+  padding: 10px 12px; box-shadow: 2px 2px 0 var(--ink); flex-wrap: wrap;
+}
+.q-lf-letter, .q-lf-blank, .q-lf-arrow {
+  font-family: var(--font-en); font-weight: 700; font-size: 1.2rem;
+}
+.q-lf-blank { color: var(--pink); font-size: 1.6rem; }
+.q-lf-options { display: flex; gap: 6px; margin-left: auto; flex-wrap: wrap; }
+.q-lf-opt {
+  padding: 4px 10px; border: 2px solid var(--ink); border-radius: var(--r-sm);
+  background: var(--cream); cursor: pointer; font-family: inherit; font-size: 0.9rem;
+}
+.q-lf-opt.selected { background: var(--pink); color: var(--white); }
+.q-lf-opt.correct-answer { background: #c8f0c8; border-color: #2a7a2a; }
+.q-lf-opt.wrong { background: #FFD6D6; border-color: #c40; }
+
+/* pic-sentence-choose · 图+句子选 A/B (笔试三) */
+.quiz-item--pic-sent { flex-direction: row; align-items: center; gap: 12px; }
+.q-ps-image { flex-shrink: 0; width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; background: var(--cream); border-radius: var(--r-sm); }
+.q-ps-img { width: 100%; height: 100%; object-fit: contain; }
+.q-ps-emoji { font-size: 3rem; }
+.q-ps-options { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.q-ps-opt {
+  text-align: left; padding: 6px 12px;
+  border: 2px solid var(--ink); border-radius: var(--r-sm);
+  background: var(--white); cursor: pointer; font-family: inherit;
+}
+.q-ps-opt .letter { font-family: var(--font-en); font-weight: 700; margin-right: 4px; }
+.q-ps-opt.selected { background: var(--pink); color: var(--white); }
+.q-ps-opt.correct-answer { background: #c8f0c8; border-color: #2a7a2a; }
+.q-ps-opt.wrong { background: #FFD6D6; border-color: #c40; }
+
+/* dialog-line-fill · 对话整句填空(从 A-E 词库选)(笔试六) */
+.q-dlf-pool {
+  background: var(--cream); border: 2px dashed var(--ink); border-radius: var(--r);
+  padding: 10px 14px; margin-bottom: 12px;
+}
+.q-dlf-pool-item { margin: 3px 0; font-family: var(--font-en); font-size: 0.95rem; }
+.q-dlf-pool-id { color: var(--pink); }
+.q-dlf-dialog {
+  background: var(--white); border: 2px solid var(--ink); border-radius: var(--r);
+  padding: 14px 18px; font-family: var(--font-en); line-height: 2;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+.q-dlf-line { margin: 6px 0; }
+.q-dlf-speaker { color: var(--pink); }
+.q-dlf-blank-no { color: var(--ink-light); font-size: 0.75rem; margin: 0 6px; }
+.q-dlf-opts { display: inline-flex; gap: 4px; }
+.q-dlf-opt {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 2px solid var(--ink); background: var(--cream);
+  font-family: var(--font-en); font-weight: 700; cursor: pointer;
+}
+.q-dlf-opt.selected { background: var(--pink); color: var(--white); }
+.q-dlf-opt.correct-answer { background: #c8f0c8; border-color: #2a7a2a; }
+.q-dlf-opt.wrong { background: #FFD6D6; border-color: #c40; }
+
 /* listen-pic-choose: 听录音 → 3 图选 1(对齐真卷听力一) */
 .quiz-item--pic-choose {
   flex-direction: column;

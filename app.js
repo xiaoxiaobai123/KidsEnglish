@@ -2857,6 +2857,259 @@
     return wrap;
   }
 
+  /* -------- 新: 听录音 → 人物/物品连线(真卷听力四) --------
+   *  items[0] = { persons:[{id,name,face,audioText,expectedTarget}], targets:[{id,image,label}] }
+   *  userAnswers[itemId] = { personId: targetId, ... }
+   * ---------------------------------------------------------- */
+  QUIZ_RENDERERS['listen-match-pic'] = function(section, body, opts = {}) {
+    const item = section.items[0];
+    if (!item) return;
+    const userAns = section.userAnswers[item.id] = section.userAnswers[item.id] || {};
+    const persons = item.persons || [];
+    const targets = item.targets || [];
+
+    const grid = h('div', { class: 'q-match-pic-grid' });
+    persons.forEach(p => {
+      const row = h('div', { class: 'q-match-pic-row' });
+
+      // 左: 人物 + 播放
+      const left = h('div', { class: 'q-match-pic-person' });
+      if (p.face?.startsWith('emoji:')) {
+        left.appendChild(h('div', { class: 'q-match-pic-face' }, p.face.slice(6)));
+      } else if (p.face) {
+        const u = resolveQuizAsset(p.face, 'image');
+        if (u) left.appendChild(h('img', { src: u, class: 'q-match-pic-face-img', alt: p.name }));
+      }
+      left.appendChild(h('div', { class: 'q-match-pic-name' }, p.name));
+      const audioBtn = h('button', { class: 'btn btn--sm btn--yellow' }, '🔊');
+      audioBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        playQuizAudio(p.audio || null, audioBtn, p.audioText, { rate: 0.85 });
+      });
+      left.appendChild(audioBtn);
+      row.appendChild(left);
+
+      // 右: 5 target 按钮
+      const targetRow = h('div', { class: 'q-match-pic-targets' });
+      targets.forEach(t => {
+        const btn = h('button', { class: 'q-match-pic-target', type: 'button' });
+        btn.appendChild(h('div', { class: 'q-mp-letter' }, t.id));
+        if (t.image?.startsWith('emoji:')) {
+          btn.appendChild(h('div', { class: 'q-mp-emoji' }, t.image.slice(6)));
+        } else {
+          const u = resolveQuizAsset(t.image, 'image');
+          if (u) btn.appendChild(h('img', { src: u, class: 'q-mp-timg', alt: t.label || '' }));
+        }
+        if (userAns[p.id] === t.id) btn.classList.add('selected');
+        if (opts.review) {
+          btn.disabled = true;
+          if (p.expectedTarget === t.id) btn.classList.add('correct-answer');
+          if (userAns[p.id] === t.id && t.id !== p.expectedTarget) btn.classList.add('wrong');
+        } else {
+          btn.addEventListener('click', () => {
+            userAns[p.id] = t.id;
+            targetRow.querySelectorAll('.q-match-pic-target').forEach(b => {
+              b.classList.toggle('selected', b.firstChild.textContent === t.id);
+            });
+          });
+        }
+        targetRow.appendChild(btn);
+      });
+      row.appendChild(targetRow);
+      grid.appendChild(row);
+    });
+    body.appendChild(grid);
+  };
+
+  /* -------- 新: 听对话 · 每空从 A/B 选(真卷听力六) --------
+   *  items[0] = { audioText, dialog:[{speaker, parts:[{t},{blank:N}]}], blanks:[{options:[A,B], correct}] }
+   *  userAnswers[itemId] = { blankIdx: optIdx }
+   * -------------------------------------------------------- */
+  QUIZ_RENDERERS['listen-fill-choose'] = function(section, body, opts = {}) {
+    const item = section.items[0];
+    if (!item) return;
+    const userAns = section.userAnswers[item.id] = section.userAnswers[item.id] || {};
+
+    // 顶部播放按钮
+    const audioRow = h('div', { class: 'q-order-controls' });
+    const bigBtn = h('button', { class: 'btn btn--sm btn--pink' }, '🔊 播放整段对话');
+    bigBtn.addEventListener('click', () => {
+      playQuizAudio(item.audio || null, bigBtn, item.audioText, { rate: 0.8 });
+    });
+    audioRow.appendChild(bigBtn);
+    body.appendChild(audioRow);
+
+    // 对话 + 填空(每空 2 选)
+    const wrap = h('div', { class: 'q-fill-choose-dialog' });
+    (item.dialog || []).forEach(line => {
+      const lineEl = h('div', { class: 'q-fill-choose-line' });
+      if (line.speaker) lineEl.appendChild(h('b', { class: 'q-fc-speaker' }, line.speaker + ': '));
+      (line.parts || []).forEach(p => {
+        if (p.t != null) {
+          lineEl.appendChild(document.createTextNode(p.t));
+        } else if (typeof p.blank === 'number') {
+          const bIdx = p.blank;
+          const b = item.blanks[bIdx];
+          const chip = h('span', { class: 'q-fc-chip' });
+          chip.appendChild(h('span', { class: 'q-fc-blank-no' }, '(' + (bIdx + 1) + ')'));
+          (b.options || []).forEach((optText, oi) => {
+            const btn = h('button', { class: 'q-fc-opt' }, ['A.','B.','C.','D.'][oi] + optText);
+            if (userAns[bIdx] === oi) btn.classList.add('selected');
+            if (opts.review) {
+              btn.disabled = true;
+              if (oi === b.correct) btn.classList.add('correct-answer');
+              if (userAns[bIdx] === oi && oi !== b.correct) btn.classList.add('wrong');
+            } else {
+              btn.addEventListener('click', () => {
+                userAns[bIdx] = oi;
+                chip.querySelectorAll('.q-fc-opt').forEach((bb, bbi) => bb.classList.toggle('selected', bbi === oi));
+              });
+            }
+            chip.appendChild(btn);
+          });
+          lineEl.appendChild(chip);
+        }
+      });
+      wrap.appendChild(lineEl);
+    });
+    body.appendChild(wrap);
+  };
+
+  /* -------- 新: 字母表填空(真卷笔试一) --------
+   *  items[0] = { blanks:[{before, after, options:[3], correct}] }
+   * ---------------------------------------------------------- */
+  QUIZ_RENDERERS['letter-fill'] = function(section, body, opts = {}) {
+    const item = section.items[0];
+    if (!item) return;
+    const userAns = section.userAnswers[item.id] = section.userAnswers[item.id] || {};
+
+    const grid = h('div', { class: 'q-letter-fill-grid' });
+    (item.blanks || []).forEach((b, bIdx) => {
+      const row = h('div', { class: 'q-letter-fill-row' });
+      row.appendChild(h('span', { class: 'q-lf-letter' }, b.before));
+      row.appendChild(h('span', { class: 'q-lf-arrow' }, ' → '));
+      row.appendChild(h('span', { class: 'q-lf-blank' }, '?'));
+      row.appendChild(h('span', { class: 'q-lf-arrow' }, ' → '));
+      row.appendChild(h('span', { class: 'q-lf-letter' }, b.after));
+
+      const opts2 = h('div', { class: 'q-lf-options' });
+      (b.options || []).forEach((optText, oi) => {
+        const btn = h('button', { class: 'q-lf-opt' }, ['A.','B.','C.'][oi] + ' ' + optText);
+        if (userAns[bIdx] === oi) btn.classList.add('selected');
+        if (opts.review) {
+          btn.disabled = true;
+          if (oi === b.correct) btn.classList.add('correct-answer');
+          if (userAns[bIdx] === oi && oi !== b.correct) btn.classList.add('wrong');
+        } else {
+          btn.addEventListener('click', () => {
+            userAns[bIdx] = oi;
+            opts2.querySelectorAll('.q-lf-opt').forEach((bb, bbi) => bb.classList.toggle('selected', bbi === oi));
+          });
+        }
+        opts2.appendChild(btn);
+      });
+      row.appendChild(opts2);
+      grid.appendChild(row);
+    });
+    body.appendChild(grid);
+  };
+
+  /* -------- 新: 看图选句子(真卷笔试三) --------
+   *  items = [{image, options:[text,text], correct}]
+   * ------------------------------------------------ */
+  QUIZ_RENDERERS['pic-sentence-choose'] = function(section, body, opts = {}) {
+    const LETTERS = ['A.','B.','C.','D.'];
+    section.items.forEach((item, idx) => {
+      const row = h('div', { class: 'quiz-item quiz-item--pic-sent' });
+      row.appendChild(h('div', { class: 'quiz-item__num' }, String(idx + 1)));
+
+      const left = h('div', { class: 'q-ps-image' });
+      if (item.image?.startsWith('emoji:')) {
+        left.appendChild(h('div', { class: 'q-ps-emoji' }, item.image.slice(6)));
+      } else {
+        const u = resolveQuizAsset(item.image, 'image');
+        if (u) left.appendChild(h('img', { src: u, class: 'q-ps-img', alt: '' }));
+      }
+      row.appendChild(left);
+
+      const userAns = section.userAnswers[item.id];
+      const optsBox = h('div', { class: 'q-ps-options' });
+      (item.options || []).forEach((optText, oi) => {
+        const btn = h('button', { class: 'q-ps-opt' },
+          h('span', { class: 'letter' }, LETTERS[oi]),
+          ' ' + optText
+        );
+        if (userAns === oi) btn.classList.add('selected');
+        if (opts.review) {
+          btn.disabled = true;
+          if (oi === item.correct) btn.classList.add('correct-answer');
+          if (userAns === oi && oi !== item.correct) btn.classList.add('wrong');
+        } else {
+          btn.addEventListener('click', () => {
+            section.userAnswers[item.id] = oi;
+            optsBox.querySelectorAll('.q-ps-opt').forEach((b, bi) => b.classList.toggle('selected', bi === oi));
+          });
+        }
+        optsBox.appendChild(btn);
+      });
+      row.appendChild(optsBox);
+      body.appendChild(row);
+    });
+  };
+
+  /* -------- 新: 对话整句填空(真卷笔试六) --------
+   *  items[0] = { pool:[{id:'A',text}], dialog:[{speaker, text, blank}], answers:{blankIdx:poolId} }
+   *  userAnswers[itemId] = { blankIdx: poolId }
+   * ---------------------------------------------- */
+  QUIZ_RENDERERS['dialog-line-fill'] = function(section, body, opts = {}) {
+    const item = section.items[0];
+    if (!item) return;
+    const userAns = section.userAnswers[item.id] = section.userAnswers[item.id] || {};
+
+    // 词库
+    const poolBox = h('div', { class: 'q-dlf-pool' });
+    (item.pool || []).forEach(p => {
+      poolBox.appendChild(h('div', { class: 'q-dlf-pool-item' },
+        h('b', { class: 'q-dlf-pool-id' }, p.id + '. '),
+        p.text
+      ));
+    });
+    body.appendChild(poolBox);
+
+    // 对话 · 每行支持 text(前缀) + blank(空位选项) + suffix(后缀) 组合
+    const dlg = h('div', { class: 'q-dlf-dialog' });
+    (item.dialog || []).forEach(line => {
+      const lineEl = h('div', { class: 'q-dlf-line' });
+      if (line.speaker) lineEl.appendChild(h('b', { class: 'q-dlf-speaker' }, line.speaker + ': '));
+      if (line.text) lineEl.appendChild(document.createTextNode(line.text + ' '));
+      if (line.blank) {
+        const blankIdx = line.blankIdx;
+        const optsBox = h('div', { class: 'q-dlf-opts' });
+        (item.pool || []).forEach(p => {
+          const btn = h('button', { class: 'q-dlf-opt' }, p.id);
+          if (userAns[blankIdx] === p.id) btn.classList.add('selected');
+          if (opts.review) {
+            btn.disabled = true;
+            const correct = item.answers?.[blankIdx];
+            if (p.id === correct) btn.classList.add('correct-answer');
+            if (userAns[blankIdx] === p.id && p.id !== correct) btn.classList.add('wrong');
+          } else {
+            btn.addEventListener('click', () => {
+              userAns[blankIdx] = p.id;
+              optsBox.querySelectorAll('.q-dlf-opt').forEach(b => b.classList.toggle('selected', b.textContent === p.id));
+            });
+          }
+          optsBox.appendChild(btn);
+        });
+        lineEl.appendChild(h('span', { class: 'q-dlf-blank-no' }, '(' + (blankIdx + 1) + ')'));
+        lineEl.appendChild(optsBox);
+      }
+      if (line.suffix) lineEl.appendChild(document.createTextNode(' ' + line.suffix));
+      dlg.appendChild(lineEl);
+    });
+    body.appendChild(dlg);
+  };
+
   /* -------- 新题型: 听录音 → 3 图选 1(对齐真卷听力一) -------- */
   QUIZ_RENDERERS['listen-pic-choose'] = function(section, body, opts = {}) {
     const LETTERS = ['A', 'B', 'C', 'D'];
