@@ -575,11 +575,12 @@
 
   function switchScreen(name) {
     if (!SCREENS.includes(name)) return console.warn('unknown screen:', name);
+    // 🔇 切屏 = 新上下文,停一切上一屏的音频 / TTS / 异步循环
+    if (currentScreen && currentScreen !== name) stopAllAudio();
     $$('.screen').forEach(s => s.classList.remove('active'));
     const t = document.getElementById('screen-' + name);
     if (t) t.classList.add('active');
     currentScreen = name;
-    // 菜单屏隐藏 Home 按钮（其它屏显示）
     const hb = $('#btn-home');
     if (name === 'menu') hb.classList.add('hidden');
     else                 hb.classList.remove('hidden');
@@ -5352,18 +5353,31 @@
     loadTangtangManifest(); // 糖糖姐奖励 + 拼读三连
     bindTopbar();
     renderTopbar();
-    switchScreen('menu');   // 确保 btn-home 正确隐藏（覆盖 HTML 的 [hidden] 属性）
+    switchScreen('menu');
     renderMenu();
-    // 淡出 splash + 欢迎气泡
+    // 淡出 splash + 欢迎气泡(不自动播音,等首次点击解锁)
     setTimeout(() => {
       const s = $('#loading-splash');
       if (s) {
         s.classList.add('fade-out');
         setTimeout(() => s.remove(), 500);
       }
-      // Cory 欢迎
       setCoachMode('greeting');
-      showCoach('greeting', { day: STATE.currentDay }, { duration: 6000 });
+      const greetLine = showCoach('greeting', { day: STATE.currentDay }, { duration: 6000, speak: false });
+
+      // 浏览器 autoplay 政策 → 页面加载时不能播音。等用户第一次点屏幕解锁后再播招呼。
+      let unlocked = false;
+      function unlockAndSpeak() {
+        if (unlocked) return;
+        unlocked = true;
+        document.removeEventListener('click',      unlockAndSpeak, true);
+        document.removeEventListener('touchstart', unlockAndSpeak, true);
+        if (greetLine && greetLine.en) {
+          setTimeout(() => speakAsCoach(greetLine.en, { coachLineRaw: greetLine._raw }), 200);
+        }
+      }
+      document.addEventListener('click',      unlockAndSpeak, true);
+      document.addEventListener('touchstart', unlockAndSpeak, true);
     }, 300);
     console.log(`[App] 启动完成 · Day ${STATE.currentDay} · Score ${STATE.score} · Voice: ${ttsVoice?.name || '(none)'}`);
   }
