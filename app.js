@@ -985,9 +985,10 @@
         // 重渲导航指示 + 句子
         main.replaceChild(buildSentenceNav(), main.firstChild);
         renderListenSentence(container, LESSON.sentences[i]);
-        await highlightAndSpeak(LESSON.sentences[i].en, container.querySelector('.sentence-display'));
+        // 连播稍慢(0.85)+ 句间停顿 1500ms,给孩子跟读/反应时间
+        await highlightAndSpeak(LESSON.sentences[i].en, container.querySelector('.sentence-display'), { rate: 0.85 });
         if (my !== audioEpoch()) return;
-        await sleep(600);
+        await sleep(1500);
       }
       if (my !== audioEpoch()) return;
       rebuildActions('done');
@@ -1014,13 +1015,14 @@
   }
 
   // 逐词高亮 + 整句 TTS（基于字符长度估算时长 · 可被 stopAllAudio 打断）
-  async function highlightAndSpeak(text, containerEl) {
+  async function highlightAndSpeak(text, containerEl, opts = {}) {
     if (!containerEl) return;
     const spans = containerEl.querySelectorAll('.word');
     const words = text.split(/\s+/).filter(Boolean);
     const my = audioEpoch();
-    const spokenPromise = speak(text);
-    const MS_PER_CHAR = 80;
+    const spokenPromise = speak(text, opts);
+    // rate 小于 1 → 每字符估算时长相应变长(节奏和 MP3 对齐)
+    const MS_PER_CHAR = Math.round(80 / (opts.rate || 1));
     for (let i = 0; i < spans.length; i++) {
       if (my !== audioEpoch()) {
         spans.forEach(s => s.classList.remove('highlight'));
@@ -2421,6 +2423,10 @@
   }
 
   function renderQuizSection() {
+    // 记住滚动位置,重渲后恢复(否则选答案会跳回顶部)
+    // quiz 页的滚容器可能是 #screen-quiz 或整个 window,两个都保一份
+    const prevScreenScroll = $('#screen-quiz')?.scrollTop ?? 0;
+    const prevWindowScroll = window.scrollY || 0;
     switchScreen('quiz');
     hideCoach();
     const screen = $('#screen-quiz');
@@ -2448,6 +2454,11 @@
       return;
     }
     renderer(section, body);
+    // 恢复滚动位置(放到下一帧,等 DOM 布局完才能 scroll)
+    requestAnimationFrame(() => {
+      if (prevScreenScroll > 0) screen.scrollTop = prevScreenScroll;
+      if (prevWindowScroll > 0) window.scrollTo(0, prevWindowScroll);
+    });
   }
 
   function buildQuizHeader(section) {
@@ -2509,12 +2520,18 @@
       if (full) correctCount++;
       const itemScored = partialScore(section.type, item, user, section.pointsPerItem);
       totalScored += itemScored;
-      // 错题入库（记录 audio ref id 级别的参考）
+      // 错题入库:从 audio 或 image 字段提取 sent/vocab id
+      // 原只看 item.audio,导致 pic-judge 等仅有 image 字段的题错了不入库
       if (!full && user !== undefined && user !== null) {
-        if (item.audio && /^(sent|vocab):/.test(item.audio)) {
-          const refId = item.audio.split(':')[1];
-          markWrong(refId);
+        let refId = null;
+        for (const field of ['audio', 'image']) {
+          const v = item[field];
+          if (typeof v === 'string' && /^(sent|vocab):/.test(v)) {
+            refId = v.split(':')[1];
+            break;
+          }
         }
+        if (refId) markWrong(refId);
       }
     });
     section.graded = true;
@@ -2765,7 +2782,11 @@
         btn.addEventListener('click', () => {
           section.userAnswers[item.id] = i;
           onPick && onPick(i, btn);
-          renderQuizSection();  // 重渲保持 selected 状态
+          // 只更新当前组按钮的 selected class,不重渲整 section
+          // (重渲 DOM 会让滚动位置归零,用户在长题滚下去选一个又跳回顶部)
+          wrap.querySelectorAll('.q-choice').forEach((b, bi) => {
+            b.classList.toggle('selected', bi === i);
+          });
         });
       }
       wrap.appendChild(btn);
