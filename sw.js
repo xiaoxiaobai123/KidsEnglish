@@ -14,7 +14,7 @@
  *   中间网挂也没事,下次打开接着下
  * ============================================================ */
 
-const VERSION = '20260424c';
+const VERSION = '20260424d';
 const CACHE_NAME = `englishkids-${VERSION}`;
 
 // 核心文件(小,一定要下,install 阻塞直到完成)
@@ -97,16 +97,29 @@ async function precacheMedia(cache) {
     }
   }
 
-  // 第一轮
-  for (let i = 0; i < urls.length; i += BATCH) {
-    const batch = urls.slice(i, i + BATCH);
-    await Promise.allSettled(batch.map(async (url) => {
-      const ok = await tryFetch(url);
-      if (!ok) failed.add(url);
-      done++;
-      reportProgress();
-    }));
+  // 流式并发:始终保持 BATCH 个 worker,一个完成立刻接下一个 URL
+  // 避免"批里 14 个秒下完 + 1 个 hang 30s 拖死整批"
+  async function runConcurrent(list, workerFn, concurrency) {
+    let idx = 0;
+    const workers = [];
+    for (let w = 0; w < concurrency; w++) {
+      workers.push((async () => {
+        while (idx < list.length) {
+          const i = idx++;
+          await workerFn(list[i]);
+        }
+      })());
+    }
+    await Promise.all(workers);
   }
+
+  // 第一轮
+  await runConcurrent(urls, async (url) => {
+    const ok = await tryFetch(url);
+    if (!ok) failed.add(url);
+    done++;
+    reportProgress();
+  }, BATCH);
 
   // 重试轮(失败 URL 指数退避,最多 MAX_RETRY 次)
   for (let retry = 1; retry <= MAX_RETRY && failed.size; retry++) {
@@ -114,13 +127,10 @@ async function precacheMedia(cache) {
     const toRetry = Array.from(failed);
     failed.clear();
     await new Promise(r => setTimeout(r, 800 * retry));
-    for (let i = 0; i < toRetry.length; i += BATCH) {
-      const batch = toRetry.slice(i, i + BATCH);
-      await Promise.allSettled(batch.map(async (url) => {
-        const ok = await tryFetch(url);
-        if (!ok) failed.add(url);
-      }));
-    }
+    await runConcurrent(toRetry, async (url) => {
+      const ok = await tryFetch(url);
+      if (!ok) failed.add(url);
+    }, BATCH);
   }
 
   broadcast({
