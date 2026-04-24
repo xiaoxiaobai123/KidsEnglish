@@ -262,10 +262,11 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
 
 .menu-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);   /* 9 格子 3×3 最整齐 */
-  gap: var(--s-lg);
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--s-md);
 }
-@media (min-width: 1400px) { .menu-grid { grid-template-columns: repeat(4, 1fr); } }
+/* MatePad SE 1280×800、iPad 横屏等 → 4 列(12 tile 变 4×3,一屏铺完) */
+@media (min-width: 1100px) { .menu-grid { grid-template-columns: repeat(4, 1fr); } }
 @media (max-width: 720px)  { .menu-grid { grid-template-columns: repeat(2, 1fr); } }
 
 .menu-tile {
@@ -273,9 +274,9 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--s-sm);
-  min-height: 180px;
-  padding: var(--s-lg);
+  gap: 2px;
+  min-height: 110px;
+  padding: 10px 12px;
   background: var(--pink);
   border: var(--border-ink);
   border-radius: var(--r-xl);
@@ -286,9 +287,9 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
 }
 .menu-tile:hover  { transform: translate(-3px, -3px); box-shadow: var(--shadow-xl); }
 .menu-tile:active { transform: translate(var(--shadow-offset), var(--shadow-offset)); box-shadow: var(--shadow-0); }
-.menu-tile .icon  { font-size: 3.5rem; line-height: 1; }
-.menu-tile .title { font-family: var(--font-zh-title); font-size: var(--fs-lg); color: var(--ink); }
-.menu-tile .sub   { font-size: var(--fs-sm); color: var(--ink-light); opacity: 0.75; }
+.menu-tile .icon  { font-size: 2.6rem; line-height: 1; }
+.menu-tile .title { font-family: var(--font-zh-title); font-size: var(--fs-md); color: var(--ink); }
+.menu-tile .sub   { font-size: var(--fs-xs); color: var(--ink-light); opacity: 0.75; }
 
 .menu-tile--pink     { background: var(--pink); }
 .menu-tile--blue     { background: var(--blue); }
@@ -2277,39 +2278,42 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
  * ============================================================ */
 .task-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px;
-  margin-top: 16px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 12px;
 }
+@media (max-width: 720px) { .task-grid { grid-template-columns: 1fr; } }
 .task-card {
   background: var(--white);
   border: var(--border-ink-thick);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow);
-  padding: 20px;
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   transition: transform 0.15s;
 }
 .task-card:hover { transform: translate(-2px, -2px); box-shadow: var(--shadow-lg); }
 .task-card.task-done { background: var(--mint); }
 .task-title {
   font-family: var(--font-zh-title);
-  font-size: 1.3rem;
+  font-size: 1.1rem;
   color: var(--ink);
 }
 .task-desc {
   font-family: var(--font-zh-body);
   color: var(--ink-light);
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   flex: 1;
+  line-height: 1.35;
 }
 .task-meta {
   display: flex; justify-content: space-between;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   color: var(--muted);
 }
+.task-card .btn { min-height: 44px; padding: 6px 16px; font-size: 0.95rem; }
 .task-status {
   font-family: var(--font-zh-body);
   color: var(--success);

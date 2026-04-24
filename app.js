@@ -683,9 +683,9 @@
     const screen = $('#screen-menu');
     screen.innerHTML = '';
     screen.appendChild(h('div', { class: 'screen-menu' },
-      h('div', { style: 'text-align: center; margin: 16px 0 32px;' },
-        h('h2', {}, `👋 今天 Day ${STATE.currentDay}`),
-        h('p', { style: 'color: var(--ink-light); font-size: 1.2rem; margin: 0;' }, unitLabel)
+      h('div', { style: 'text-align: center; margin: 6px 0 14px;' },
+        h('h2', { style: 'margin: 0 0 4px 0; font-size: 1.6rem;' }, `👋 今天 Day ${STATE.currentDay}`),
+        h('p', { style: 'color: var(--ink-light); font-size: 1rem; margin: 0;' }, unitLabel)
       ),
       h('div', { class: 'menu-grid' },
         ...MENU_TILES.map(t =>
