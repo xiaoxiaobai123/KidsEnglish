@@ -118,6 +118,20 @@ def main():
 
     print(f'\n[Done] ok={stats["ok"]}  fail={stats["fail"]}  skip={stats.get("skip",0)}')
 
+    # 更新 manifest.json(只列出真存在的 jpg)
+    import json
+    IMG_DIR = BASE / 'audio' / 'images'
+    manifest_path = IMG_DIR / 'manifest.json'
+    manifest = {
+        'provider': 'mixed (pollinations + minimax)',
+        'model': 'flux / image-01',
+        'style': STYLE,
+        'vocab':     sorted(p.stem for p in VOCAB_DIR.glob('*.jpg')),
+        'sentences': sorted(p.stem for p in SENT_DIR.glob('*.jpg')),
+    }
+    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
+    print(f"[Manifest] updated: vocab={len(manifest['vocab'])}, sent={len(manifest['sentences'])}")
+
 
 if __name__ == '__main__':
     main()
