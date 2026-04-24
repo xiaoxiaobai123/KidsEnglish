@@ -1033,36 +1033,136 @@
     main.innerHTML = '';
     const s = LESSON.sentences[LESSON.sentenceIdx];
 
+    // 跟一跟专属录音状态(每次重置)
+    let followMediaRecorder = null;
+    let followBlob = null;
+    let followUrl = null;
+    let followStream = null;
+    let followChunks = [];
+    let followStartMs = 0;
+
     main.appendChild(buildSentenceNav());
     main.appendChild(h('div', { class: 'mascot' }, '🗣️'));
 
-    // 句子区（跟读识别后会高亮对错）
-    const sentEl = h('div', { class: 'sentence-display sentence-follow' });
-    const words = s.en.split(/\s+/).filter(Boolean);
-    words.forEach((w, i) => {
-      sentEl.appendChild(h('span', { class: 'follow-word', 'data-w': i }, w));
-      if (i < words.length - 1) sentEl.appendChild(document.createTextNode(' '));
-    });
+    const sentEl = h('div', { class: 'sentence-display' }, s.en);
     main.appendChild(sentEl);
     main.appendChild(h('div', { class: 'sentence-zh' }, s.zh));
 
-    // 识别结果显示区（默认隐藏）
-    const resultBox = h('div', { class: 'follow-result' });
-    main.appendChild(resultBox);
+    // 状态行 + 按钮(简化版 3 大按钮 + 2 辅助)
+    const statusEl = h('div', { class: 'follow-status' }, '👆 先听老师读,再按麦克风跟读');
+    main.appendChild(statusEl);
 
-    main.appendChild(h('div', { class: 'flex gap-md justify-center', style: 'margin-top: 16px; flex-wrap: wrap;' },
-      h('button', { class: 'btn btn--lg btn--pink',   onclick: () => speak(s.en) }, '🔊 原速'),
-      h('button', { class: 'btn btn--lg btn--yellow', onclick: () => speak(s.en, { rate: 0.55 }) }, '🐢 慢速'),
-      (() => {
-        const micBtn = h('button', { class: 'btn btn--lg btn--blue mic-btn' }, '🎤 我来读');
-        micBtn.addEventListener('click', () => startFollowRecognition(s, sentEl, resultBox, micBtn));
-        return micBtn;
-      })()
-    ));
+    const primaryRow = h('div', { class: 'flex gap-md justify-center', style: 'margin-top: 14px; flex-wrap: wrap;' });
+    const teacherBtn = h('button', { class: 'btn btn--lg btn--mint' }, '🔊 听老师');
+    const recBtn = h('button', { class: 'btn btn--xl btn--pink voice-rec-btn' }, '🎤 录我的');
+    const myBtn = h('button', { class: 'btn btn--lg btn--yellow' }, '🔊 听我的');
+    myBtn.disabled = true;
+    primaryRow.append(teacherBtn, recBtn, myBtn);
+    main.appendChild(primaryRow);
 
-    main.appendChild(h('div', { style: 'font-family: var(--font-zh-body); color: var(--ink-light); margin-top: 20px; text-align: center;' }, '家长也可以直接评星(或让识别打分)：'));
+    const secondaryRow = h('div', { class: 'flex gap-sm justify-center', style: 'margin-top: 10px; flex-wrap: wrap;' });
+    const slowBtn = h('button', { class: 'btn btn--sm' }, '🐢 老师慢读');
+    const compareBtn = h('button', { class: 'btn btn--sm btn--yellow' }, '👂 对比听');
+    compareBtn.disabled = true;
+    secondaryRow.append(slowBtn, compareBtn);
+    main.appendChild(secondaryRow);
+
+    teacherBtn.addEventListener('click', () => {
+      statusEl.textContent = '🔊 老师读中...';
+      speak(s.en);
+    });
+    slowBtn.addEventListener('click', () => {
+      statusEl.textContent = '🐢 老师慢读...';
+      speak(s.en, { rate: 0.55 });
+    });
+
+    async function startRec() {
+      try {
+        followStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        followChunks = [];
+        let mt = '';
+        for (const t of ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg']) {
+          if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) { mt = t; break; }
+        }
+        followMediaRecorder = mt ? new MediaRecorder(followStream, { mimeType: mt }) : new MediaRecorder(followStream);
+        followMediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) followChunks.push(e.data); };
+        followMediaRecorder.onstop = () => {
+          const durMs = Date.now() - followStartMs;
+          followBlob = new Blob(followChunks, { type: followMediaRecorder.mimeType || mt || 'audio/webm' });
+          if (followUrl) URL.revokeObjectURL(followUrl);
+          followUrl = URL.createObjectURL(followBlob);
+          if (followStream) { followStream.getTracks().forEach(t => t.stop()); followStream = null; }
+          recBtn.textContent = '🎤 重录';
+          recBtn.classList.remove('recording');
+          if (followBlob.size >= 200) {
+            myBtn.disabled = false;
+            compareBtn.disabled = false;
+            statusEl.textContent = '🎉 录了 ' + (durMs / 1000).toFixed(1) + '秒 · 自动回放中...';
+            statusEl.style.color = '#090';
+            setTimeout(() => playMyVoice(() => {
+              statusEl.textContent = '✅ 听到自己的了吗?按 👂 跟老师比,或重录一次';
+            }), 200);
+          } else {
+            statusEl.textContent = '⚠️ 没录到声音(' + followBlob.size + 'B) · 检查麦克风权限';
+            statusEl.style.color = '#c40';
+          }
+        };
+        followMediaRecorder.start(200);
+        followStartMs = Date.now();
+        recBtn.textContent = '⏹ 停止';
+        recBtn.classList.add('recording');
+        statusEl.textContent = '🔴 录音中... 读 "' + s.en + '" 完按停止';
+        statusEl.style.color = '#c03';
+      } catch (e) {
+        alert('无法访问麦克风 · 请授权\n\n' + (e.message || e.name || ''));
+      }
+    }
+
+    function playMyVoice(onEnd) {
+      if (!followUrl) return;
+      const a = new Audio(followUrl);
+      a.onended = () => onEnd && onEnd();
+      a.onerror = () => {
+        statusEl.textContent = '⚠️ 播放失败';
+        statusEl.style.color = '#c40';
+        onEnd && onEnd();
+      };
+      a.play().catch(err => {
+        statusEl.textContent = '⚠️ 播放被拦截 · 再点 "🔊 听我的"';
+        statusEl.style.color = '#c80';
+        onEnd && onEnd();
+      });
+    }
+
+    recBtn.addEventListener('click', () => {
+      if (followMediaRecorder && followMediaRecorder.state === 'recording') followMediaRecorder.stop();
+      else startRec();
+    });
+
+    myBtn.addEventListener('click', () => {
+      statusEl.textContent = '🔊 回放中...';
+      statusEl.style.color = '#06a';
+      playMyVoice(() => { statusEl.textContent = '✅ 听完了'; statusEl.style.color = '#090'; });
+    });
+
+    compareBtn.addEventListener('click', async () => {
+      if (!followUrl) return;
+      statusEl.textContent = '🔊 老师先读...';
+      statusEl.style.color = '#06a';
+      await speak(s.en);
+      await sleep(400);
+      statusEl.textContent = '🎤 轮到你的录音...';
+      playMyVoice(() => { statusEl.textContent = '✅ 对比完了 · 像不像?'; statusEl.style.color = '#090'; });
+    });
+
+    // 家长评星(保留,不是每次都打)
+    main.appendChild(h('div', { style: 'color: var(--ink-light); margin-top: 24px; text-align: center;' }, '家长评分 → 进下一句:'));
     main.appendChild(makeStarRating(n => {
       LESSON.stageStars.follow = Math.max(LESSON.stageStars.follow, n);
+      // 清理当前句的录音资源
+      if (followMediaRecorder && followMediaRecorder.state === 'recording') { try { followMediaRecorder.stop(); } catch(e){} }
+      if (followStream) followStream.getTracks().forEach(t => t.stop());
+      if (followUrl) URL.revokeObjectURL(followUrl);
       if (LESSON.sentenceIdx < LESSON.sentences.length - 1) {
         LESSON.sentenceIdx++;
         stageFollow();
@@ -1071,6 +1171,7 @@
       }
     }));
 
+    // 首次进页面自动让老师示范一次
     const my = audioEpoch();
     setTimeout(() => { if (my === audioEpoch()) speak(s.en); }, 400);
   }

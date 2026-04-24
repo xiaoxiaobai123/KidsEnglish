@@ -3097,6 +3097,20 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* 跟一跟关卡状态行 */
+.follow-status {
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink-light);
+  padding: 10px 16px;
+  margin: 14px 0 4px;
+  min-height: 24px;
+  background: #fff9e0;
+  border: 2px dashed #e8ce7a;
+  border-radius: 12px;
+}
+
 /* 第 2 次测验标识横幅 */
 .pq-test2-banner {
   text-align: center;
