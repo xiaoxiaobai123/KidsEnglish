@@ -3348,8 +3348,12 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
 .q-order-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, 1fr);
   gap: 12px;
   width: 100%;
+  /* 填满 quiz-body 剩余高度,配合 cell/img 的 min-height:0 实现 6 图一屏自适应 */
+  flex: 1;
+  min-height: 0;
 }
 .q-order-cell {
   background: var(--white);
@@ -3360,37 +3364,43 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-height: 0;
 }
 .q-order-cell img {
   width: 100%;
-  /* 固定高度 · 让 6 图 3x2 排列时不触发滚动 */
-  height: 110px;
-  object-fit: cover;
+  /* 占 cell 剩余空间,保持比例完整显示(不裁剪,不拉伸) */
+  flex: 1;
+  min-height: 0;
+  object-fit: contain;
   border-radius: var(--r-sm);
   display: block;
   background: var(--cream);
 }
 .q-order-nums {
   display: flex;
-  gap: 3px;
+  gap: 4px;
   justify-content: center;
+  flex-shrink: 0;
 }
 .q-order-num {
-  width: 24px; height: 24px;
+  width: 28px; height: 28px;
   border: 2px solid var(--ink);
   border-radius: 50%;
   background: var(--cream);
   font-family: var(--font-en);
   font-weight: 700;
   cursor: pointer;
-  font-size: 0.78rem;
+  font-size: 0.85rem;
 }
 .q-order-num.selected { background: var(--pink); color: var(--white); }
 .q-order-num.correct  { background: var(--success); color: var(--white); }
 .q-order-num.wrong    { background: var(--error); color: var(--white); }
 .q-order-num.correct-answer { outline: 2px solid var(--success); }
 @media (max-width: 700px) {
-  .q-order-grid { grid-template-columns: repeat(2, 1fr); }
+  .q-order-grid {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+  }
 }
 
 /* 底部：操作条 */
