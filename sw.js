@@ -14,7 +14,7 @@
  *   中间网挂也没事,下次打开接着下
  * ============================================================ */
 
-const VERSION = '20260424b';
+const VERSION = '20260424c';
 const CACHE_NAME = `englishkids-${VERSION}`;
 
 // 核心文件(小,一定要下,install 阻塞直到完成)
@@ -66,17 +66,35 @@ async function precacheMedia(cache) {
   let done = 0;
 
   // 尝试抓一个 URL,返回 true/false(成功与否)
+  // 30s timeout 防止单个 hang fetch 拖死整批
   async function tryFetch(url) {
     try {
       const req = new Request(url);
       if (await cache.match(req)) return true;
-      const resp = await fetch(url, { mode: 'same-origin' });
-      if (resp.ok && resp.status === 200) {
-        await cache.put(req, resp);
-        return true;
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 30000);
+      try {
+        const resp = await fetch(url, { mode: 'same-origin', signal: ctrl.signal });
+        if (resp.ok && resp.status === 200) {
+          await cache.put(req, resp);
+          return true;
+        }
+      } finally {
+        clearTimeout(t);
       }
-    } catch (e) { /* swallow */ }
+    } catch (e) { /* swallow (timeout / network / 4xx-5xx) */ }
     return false;
+  }
+
+  // 每完成一个就上报进度 (不等整批),避免"卡在某一批"的假象
+  let lastBroadcast = 0;
+  function reportProgress() {
+    const now = Date.now();
+    // 节流:最多 300ms 一次,避免广播风暴
+    if (now - lastBroadcast > 300 || done === urls.length) {
+      lastBroadcast = now;
+      broadcast({ type: 'precache-progress', done, total: urls.length, failed: failed.size });
+    }
   }
 
   // 第一轮
@@ -86,8 +104,8 @@ async function precacheMedia(cache) {
       const ok = await tryFetch(url);
       if (!ok) failed.add(url);
       done++;
+      reportProgress();
     }));
-    broadcast({ type: 'precache-progress', done, total: urls.length, failed: failed.size });
   }
 
   // 重试轮(失败 URL 指数退避,最多 MAX_RETRY 次)
