@@ -1682,9 +1682,10 @@
       score: earned,
       date: today,
     };
-    // 任务板打卡
+    // 任务板打卡:按 unit 分开记(同一天切 unit 不会串绿色)
     STATE.tasksDone[today] = STATE.tasksDone[today] || {};
-    STATE.tasksDone[today].lesson = true;
+    const lessonKey = LESSON.unit ? ('lesson_u' + LESSON.unit) : 'lesson';
+    STATE.tasksDone[today][lessonKey] = true;
     saveState();
 
     renderResult({ stars: totalStars, score: earned, day: LESSON.day });
@@ -3279,9 +3280,12 @@
 
     const today = new Date().toISOString().slice(0, 10);
     const done = STATE.tasksDone[today] || {};
-    const doneCount = Object.values(done).filter(x => x).length;
     const unit = unitForDay(STATE.currentDay);
+    // lesson 任务按 unit 分记(同一天切 unit 不会错显已完成)
+    const lessonKey = unit ? ('lesson_u' + unit.id) : 'lesson';
     const dueWords = srsGetDueWords(50).length;
+    // 按本 unit 的三项算完成数,避免跨 unit 计数
+    const doneCount = [lessonKey, 'vocabSrs', 'dictation'].filter(k => done[k]).length;
 
     const page = h('div', { style: 'max-width: 980px; margin: 0 auto; padding: 16px 24px;' });
     page.appendChild(h('h2', { style: 'text-align: center;' }, '🎯 今日任务'));
@@ -3291,7 +3295,7 @@
     // ——— 流程引导条 ———
     // 3 步流程:主课 → 闯关 → 默写,当前步骤加 pulse 高亮,已完成打钩
     const FLOW_STEPS = [
-      { id: 'lesson',   emoji: '🎧', label: '1. 主课' },
+      { id: lessonKey,  emoji: '🎧', label: '1. 主课' },
       { id: 'vocabSrs', emoji: '🧠', label: '2. 闯关' },
       { id: 'dictation',emoji: '✏️', label: '3. 默写' },
     ];
@@ -3319,7 +3323,7 @@
 
     const tasks = [
       {
-        id: 'lesson',
+        id: lessonKey,
         title: '🎧 听力吸收',
         desc: `整单元 ${unit ? unit.titleZh : ''}闯关 · 听/跟/填/背/换 5 关`,
         time: '10-15 分钟',
