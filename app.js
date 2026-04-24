@@ -2857,6 +2857,60 @@
     return wrap;
   }
 
+  /* -------- 新题型: 听录音 → 3 图选 1(对齐真卷听力一) -------- */
+  QUIZ_RENDERERS['listen-pic-choose'] = function(section, body, opts = {}) {
+    const LETTERS = ['A', 'B', 'C', 'D'];
+    section.items.forEach((item, idx) => {
+      const row = h('div', { class: 'quiz-item quiz-item--pic-choose' });
+      row.appendChild(h('div', { class: 'quiz-item__num' }, String(idx + 1)));
+
+      // 上方:音频按钮
+      const audioRow = h('div', { class: 'q-pc-audio' });
+      const audioBtn = h('button', { class: 'q-audio-btn' }, '🔊 听一听');
+      audioBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // rate 0.85 · 低年级听得清
+        playQuizAudio(item.audio, audioBtn, item.audioText, { rate: 0.85 });
+      });
+      audioRow.appendChild(audioBtn);
+      row.appendChild(audioRow);
+
+      // 下方:3 张图/emoji 选项
+      const userAns = section.userAnswers[item.id];
+      const opts3 = h('div', { class: 'q-pc-options' });
+      (item.options || []).forEach((opt, i) => {
+        const cell = h('button', { class: 'q-pc-option', type: 'button' });
+        cell.appendChild(h('div', { class: 'q-pc-letter' }, LETTERS[i] + '.'));
+        // 优先图片 · 无图 fallback emoji
+        const imgUrl = opt.image ? resolveQuizAsset(opt.image, 'image') : null;
+        if (imgUrl) {
+          cell.appendChild(h('img', { src: imgUrl, alt: opt.label || '', loading: 'lazy', class: 'q-pc-img' }));
+        } else if (opt.emoji) {
+          cell.appendChild(h('div', { class: 'q-pc-emoji' }, opt.emoji));
+        }
+        if (opt.label) cell.appendChild(h('div', { class: 'q-pc-label' }, opt.label));
+
+        if (userAns === i) cell.classList.add('selected');
+        if (opts.review) {
+          cell.disabled = true;
+          if (i === item.correct) cell.classList.add('correct');
+          else if (userAns === i && userAns !== item.correct) cell.classList.add('wrong');
+        } else {
+          cell.addEventListener('click', () => {
+            section.userAnswers[item.id] = i;
+            // 只 toggle class · 不重渲(保滚动位置)
+            opts3.querySelectorAll('.q-pc-option').forEach((b, bi) => {
+              b.classList.toggle('selected', bi === i);
+            });
+          });
+        }
+        opts3.appendChild(cell);
+      });
+      row.appendChild(opts3);
+      body.appendChild(row);
+    });
+  };
+
   /* -------- 一、听录音选词 -------- */
   QUIZ_RENDERERS['listen-choose'] = function(section, body, opts = {}) {
     section.items.forEach((item, idx) => {

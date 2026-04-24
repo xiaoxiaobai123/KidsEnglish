@@ -1889,6 +1889,59 @@ const QUIZ_PAPERS = {
       ],
     },
 
+    /* ─────────────── 真卷 · U3-U4 月考 (时代英语报) ───────────────
+     * 来源: 时代英语报一年级下册自我评价 2
+     * 听力原文 + 参考答案来自原出版物(权威 · 答案唯一)
+     * 注: 听力 audio 走 TTS(原卷录音未数字化) · audioText 即听力原文
+     * 本次仅 digitize 听力第一大题作 demo · 其余 section 后续扩展
+     * ────────────────────────────────────────────────────────── */
+    {
+      id: 'u3_paperReal1',
+      title: '真卷 · U3-U4 月考',
+      subtitle: '时代英语报 · 权威真卷(持续扩展中)',
+      source: '时代英语报一年级下册自我评价2',
+      totalPoints: 10,
+      sections: [
+        { id:1, type:'listen-pic-choose',
+          title:'一、听录音,选出与所听内容相符的图片(听两遍)',
+          titleEn:'Listen and choose the picture',
+          hint:'听录音 → 点对应的图(每题 2 分)',
+          pointsPerItem:2,
+          items:[
+            { id:'R1_01', audioText:'I like onions.',
+              options:[
+                { image:'vocab:u3_onion',  label:'onions' },
+                { emoji:'🍌',               label:'bananas' },
+                { emoji:'🍇',               label:'grapes' },
+              ], correct:0 },
+            { id:'R1_02', audioText:'The flowers are beautiful.',
+              options:[
+                { image:'vocab:u4_tree',   label:'trees' },
+                { image:'vocab:u4_flower', label:'flowers' },
+                { image:'vocab:u4_kite',   label:'kites' },
+              ], correct:1 },
+            { id:'R1_03', audioText:'Look at the pepper. It can sing.',
+              options:[
+                { image:'vocab:u3_carrot', label:'carrot' },
+                { image:'vocab:u3_pea',    label:'pea' },
+                { image:'vocab:u3_pepper', label:'pepper' },
+              ], correct:2 },
+            { id:'R1_04', audioText:'How many birds? Three birds.',
+              options:[
+                { emoji:'🐦',       label:'one bird' },
+                { emoji:'🐦🐦',     label:'two birds' },
+                { emoji:'🐦🐦🐦',   label:'three birds' },
+              ], correct:2 },
+            { id:'R1_05', audioText:'Two carrots, please.',
+              options:[
+                { emoji:'🥕🥕',             label:'two carrots' },
+                { image:'vocab:u3_pepper', label:'peppers' },
+                { emoji:'🍒🍒',             label:'cherries' },
+              ], correct:0 },
+          ]},
+      ],
+    },
+
   ],
 
 };
