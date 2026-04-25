@@ -14,8 +14,13 @@
  *   中间网挂也没事,下次打开接着下
  * ============================================================ */
 
-const VERSION = '20260424s';
-const CACHE_NAME = `englishkids-${VERSION}`;
+const VERSION = '20260424t';
+// 双缓存策略:
+//   CORE_CACHE 跟 VERSION 走,每次代码发版重建 (HTML/JS/CSS/manifest ~300KB)
+//   MEDIA_CACHE 固定名字,版本升级后不清空 (mp3/图 ~30MB 下过就保留)
+// 关键:用户每次 VERSION bump 只重下 core,media 永久保留,不再每次清 30MB
+const CORE_CACHE  = `englishkids-core-${VERSION}`;
+const MEDIA_CACHE = `englishkids-media-v1`;   // 需要强制清全部 media · 手动 bump v1→v2
 
 // 核心文件(小,一定要下,install 阻塞直到完成)
 const CORE_FILES = [
@@ -36,20 +41,58 @@ const CORE_FILES = [
   './audio/tangtang-spell-manifest.json',
 ];
 
+// 判断 URL 是否是媒体资源 (决定走 MEDIA_CACHE 还是 CORE_CACHE)
+function isMediaUrl(url) {
+  return /\.(mp3|wav|m4a|webm|ogg|jpg|jpeg|png|woff2|woff)$/i.test(url.pathname)
+    && !url.pathname.endsWith('manifest.json');
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
-    const cache = await caches.open(CACHE_NAME);
-    try { await cache.addAll(CORE_FILES); } catch (e) { console.warn('[SW] core precache fail', e); }
-    // 非阻塞:后台预下全部媒体(不影响 install 完成)
-    precacheMedia(cache).catch(err => console.warn('[SW] media precache fail', err));
+    // 1. 阻塞迁移:把老 cache (englishkids-YYYY / englishkids-core-OLD) 的媒体资源
+    //    迁到 MEDIA_CACHE,必须在 precacheMedia 之前完成,否则 precacheMedia 会重下 30MB
+    const mediaCache = await caches.open(MEDIA_CACHE);
+    const names = await caches.keys();
+    for (const n of names) {
+      if (n === CORE_CACHE || n === MEDIA_CACHE) continue;
+      if (!n.startsWith('englishkids-')) continue;
+      try {
+        const oldCache = await caches.open(n);
+        const keys = await oldCache.keys();
+        for (const req of keys) {
+          try {
+            const u = new URL(req.url);
+            if (isMediaUrl(u)) {
+              if (!(await mediaCache.match(req))) {
+                const resp = await oldCache.match(req);
+                if (resp) await mediaCache.put(req, resp.clone());
+              }
+            }
+          } catch (e) { /* skip 单条 */ }
+        }
+      } catch (e) { /* 迁移失败不致命 */ }
+    }
+
+    // 2. 下 core files (阻塞)
+    const coreCache = await caches.open(CORE_CACHE);
+    try { await coreCache.addAll(CORE_FILES); } catch (e) { console.warn('[SW] core precache fail', e); }
+
+    // 3. 后台 precacheMedia (非阻塞 · 迁移已放 MEDIA_CACHE 的 · tryFetch 会 skip)
+    precacheMedia(mediaCache).catch(err => console.warn('[SW] media precache fail', err));
+
     await self.skipWaiting();
   })());
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
+    // install 阶段已完成 media 迁移,这里只删老 cache
     const names = await caches.keys();
-    await Promise.all(names.map(n => n !== CACHE_NAME ? caches.delete(n) : null));
+    await Promise.all(names.map(n => {
+      if (n === CORE_CACHE || n === MEDIA_CACHE) return null;
+      if (!n.startsWith('englishkids-')) return null;
+      return caches.delete(n);
+    }));
     await self.clients.claim();
   })());
 });
@@ -187,7 +230,7 @@ function broadcast(msg) {
 // 客户端发来手动重试请求(点击失败徽章时)
 self.addEventListener('message', (event) => {
   if (!event.data || event.data.type !== 'precache-retry-manual') return;
-  caches.open(CACHE_NAME).then(cache => precacheMedia(cache));
+  caches.open(MEDIA_CACHE).then(cache => precacheMedia(cache));
 });
 
 // ─── 运行时 fetch handler ────────────────────────────────────
@@ -200,18 +243,29 @@ self.addEventListener('fetch', (event) => {
   const isCacheable = /\.(mp3|jpg|jpeg|png|woff2|json|js|css|html|ico)$/.test(url.pathname) || url.pathname === '/' || url.pathname.endsWith('/');
   if (!isCacheable) return;
 
-  const isMedia = /\.(mp3|mp4|wav|webm|ogg|m4a)$/.test(url.pathname);
+  const media = isMediaUrl(url);
+  const cacheName = media ? MEDIA_CACHE : CORE_CACHE;
+  const isStreamMedia = /\.(mp3|mp4|wav|webm|ogg|m4a)$/.test(url.pathname);
 
   event.respondWith((async () => {
-    const cache = await caches.open(CACHE_NAME);
-    const cached = await cache.match(req, { ignoreSearch: false, ignoreVary: true });
+    // 先在主 cache(media 或 core)找,如果没有再到另一个 cache 找(迁移过渡期兼容)
+    const primary = await caches.open(cacheName);
+    let cached = await primary.match(req, { ignoreSearch: false, ignoreVary: true });
+    if (!cached) {
+      const secondary = await caches.open(media ? CORE_CACHE : MEDIA_CACHE);
+      cached = await secondary.match(req, { ignoreSearch: false, ignoreVary: true });
+      if (cached) {
+        // 异步迁到主 cache,方便下次命中
+        primary.put(req, cached.clone()).catch(() => {});
+      }
+    }
     if (cached) return cached;
 
-    const fetchReq = isMedia ? new Request(req.url, { mode: 'same-origin' }) : req;
+    const fetchReq = isStreamMedia ? new Request(req.url, { mode: 'same-origin' }) : req;
     try {
       const resp = await fetch(fetchReq);
       if (resp.ok && resp.status === 200) {
-        cache.put(req, resp.clone()).catch(() => {});
+        primary.put(req, resp.clone()).catch(() => {});
       }
       return resp;
     } catch (e) {
