@@ -2248,6 +2248,37 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
   border-top: 1px dashed #666;
   padding-top: 4px;
 }
+.pq-order-emoji {
+  font-size: 2.5rem;
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+/* —— 新题型打印样式 —— */
+/* listen-pic-choose · 听录音选 3 图 */
+.print-quiz .pq-pc-row {
+  display: flex; align-items: center; gap: 12px; margin: 8px 0;
+}
+.print-quiz .pq-pc-num { width: 70px; font-weight: 700; flex-shrink: 0; }
+.print-quiz .pq-pc-opts { display: flex; gap: 12px; flex: 1; }
+.print-quiz .pq-pc-cell {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  border: 1px solid #999; padding: 4px; min-width: 80px;
+}
+.print-quiz .pq-pc-letter { font-weight: 700; font-size: 0.85rem; }
+.print-quiz .pq-pc-img { width: 70px; height: 70px; object-fit: contain; }
+.print-quiz .pq-pc-emoji { font-size: 2rem; line-height: 1.2; }
+
+/* pic-sentence-choose · 图 + 2 句选 1 */
+.print-quiz .pq-ps-row {
+  display: flex; align-items: center; gap: 12px; margin: 8px 0;
+  border-bottom: 1px dashed #ccc; padding-bottom: 6px;
+}
+.print-quiz .pq-ps-num { width: 60px; font-weight: 700; flex-shrink: 0; }
+.print-quiz .pq-ps-img { width: 70px; height: 70px; object-fit: contain; flex-shrink: 0; }
+.print-quiz .pq-ps-emoji { font-size: 2rem; flex-shrink: 0; min-width: 70px; text-align: center; }
+.print-quiz .pq-ps-opts { flex: 1; }
+.print-quiz .pq-ps-opts > div { margin: 2px 0; }
 
 @media print {
   /* 打印时图片别太大 */

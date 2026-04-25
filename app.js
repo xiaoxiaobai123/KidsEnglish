@@ -5561,7 +5561,12 @@
           const b = h('button', { class: 'btn btn--sm' }, `U${u.id} ${u.emoji}`);
           b.addEventListener('click', () => {
             m.close();
-            template.render(u.id);
+            // quiz 模板 · 如果 unit 有 QUIZ_PAPERS (固定卷) 则先让用户选卷
+            if (template.id === 'quiz' && typeof QUIZ_PAPERS !== 'undefined' && QUIZ_PAPERS[u.id]) {
+              openPrintPaperPicker(u.id, template);
+            } else {
+              template.render(u.id);
+            }
           });
           grid.appendChild(b);
         });
@@ -5571,6 +5576,32 @@
           const allBtn = h('button', { class: 'btn btn--lg btn--pink', style: 'grid-column: span 4;', onclick: () => { m.close(); template.render(null); } }, '📋 生成错题表');
           grid.appendChild(allBtn);
         }
+        return grid;
+      })(),
+      h('div', { class: 'modal-footer' }, h('button', { class: 'btn', onclick: () => m.close() }, '取消'))
+    ));
+  }
+
+  // 有固定卷的 unit · 打印前让用户选哪套卷
+  function openPrintPaperPicker(unit, template) {
+    const papers = QUIZ_PAPERS[unit] || [];
+    const m = modal(h('div', {},
+      h('h3', {}, `Unit ${unit} · 选要打印的卷子`),
+      (() => {
+        const grid = h('div', { style: 'display: flex; flex-direction: column; gap: 10px; margin: 16px 0;' });
+        papers.forEach(p => {
+          const b = h('button', { class: 'btn btn--lg btn--pink' },
+            h('div', { style: 'font-weight:700;' }, p.title),
+            h('div', { style: 'font-size:0.8rem; opacity:0.9;' }, p.subtitle || '')
+          );
+          b.style.textAlign = 'left';
+          b.addEventListener('click', () => { m.close(); template.render(unit, p.id); });
+          grid.appendChild(b);
+        });
+        // 兜底:随机抽题卷(老行为)
+        const rand = h('button', { class: 'btn btn--sm' }, '🎲 随机抽题卷(练习用)');
+        rand.addEventListener('click', () => { m.close(); template.render(unit, null); });
+        grid.appendChild(rand);
         return grid;
       })(),
       h('div', { class: 'modal-footer' }, h('button', { class: 'btn', onclick: () => m.close() }, '取消'))
@@ -5644,11 +5675,15 @@
   }
 
   // —— 模板 3: 模拟试卷 (A4 · 12 大题笔试版，听力用音频 ID 标注) ——
-  function renderPrintQuiz(unit) {
+  function renderPrintQuiz(unit, paperId) {
     if (typeof QUIZ_BANKS === 'undefined' || !QUIZ_BANKS[unit]) {
       toast('此单元题库待建'); return;
     }
-    const paper = generateQuizPaper(unit);
+    // 指定 paperId · 走固定卷(Sim1/Sim2/Real1),否则随机抽
+    const paper = paperId && typeof generatePaperById === 'function'
+      ? generatePaperById(unit, paperId)
+      : generateQuizPaper(unit);
+    if (!paper) { toast('卷子找不到'); return; }
     const body = h('div', { class: 'print-quiz' });
     body.appendChild(h('h2', { class: 'pq-title' }, `${paper.title} · 单元测试卷`));
     body.appendChild(h('div', { class: 'pq-meta' },
@@ -5657,9 +5692,28 @@
       h('span', {}, '得分：_______ / 100')
     ));
 
+    // 单 item 多空题型 · 按空数算总分;否则按 item 数
+    const sectionPoints = (sec) => {
+      if (sec.type === 'listen-fill-choose' || sec.type === 'letter-fill') {
+        return (sec.items[0]?.blanks?.length || 0) * sec.pointsPerItem;
+      }
+      if (sec.type === 'dialog-line-fill') {
+        return Object.keys(sec.items[0]?.answers || {}).length * sec.pointsPerItem;
+      }
+      if (sec.type === 'listen-order') {
+        return (sec.items[0]?.images?.length || 1) * sec.pointsPerItem;
+      }
+      if (sec.type === 'listen-match-pic') {
+        return (sec.items[0]?.persons?.length || 0) * sec.pointsPerItem;
+      }
+      if (sec.type === 'match-columns' || sec.type === 'dialog-fill' || sec.type === 'listen-fill') {
+        return sec.pointsPerItem;  // 老题型 1 item 拿满分
+      }
+      return sec.items.length * sec.pointsPerItem;
+    };
     paper.sections.forEach(sec => {
       const s = h('div', { class: 'pq-section' });
-      s.appendChild(h('h3', {}, sec.title + ` (共 ${sec.items.length * sec.pointsPerItem} 分)`));
+      s.appendChild(h('h3', {}, sec.title + ` (共 ${sectionPoints(sec)} 分)`));
       if (sec.hint) s.appendChild(h('p', { class: 'pq-hint' }, sec.hint));
 
       const type = sec.type;
@@ -5747,14 +5801,137 @@
         const item = sec.items[0];
         if (item) {
           const grid = h('div', { class: 'pq-order-grid' });
-          item.images.forEach((imgRef, idx) => {
+          item.images.forEach((img, idx) => {
             const cell = h('div', { class: 'pq-order-cell' });
-            const imgUrl = resolveQuizAsset(imgRef, 'image');
-            if (imgUrl) cell.appendChild(h('img', { src: imgUrl, class: 'pq-order-img' }));
+            // 支持 string ref 或 object {image, correctOrder}
+            const imgRef = typeof img === 'string' ? img : img.image;
+            if (typeof imgRef === 'string' && imgRef.startsWith('emoji:')) {
+              cell.appendChild(h('div', { class: 'pq-order-emoji' }, imgRef.slice(6)));
+            } else {
+              const imgUrl = resolveQuizAsset(imgRef, 'image');
+              if (imgUrl) cell.appendChild(h('img', { src: imgUrl, class: 'pq-order-img' }));
+            }
             cell.appendChild(h('div', { class: 'pq-order-num-box' }, '(   )'));
             grid.appendChild(cell);
           });
           s.appendChild(grid);
+        }
+      } else if (type === 'listen-pic-choose') {
+        // 新: 听录音选图 · 每题 3 图 + 括号
+        sec.items.forEach((item, i) => {
+          const row = h('div', { class: 'pq-pc-row' });
+          row.appendChild(h('div', { class: 'pq-pc-num' }, `${i + 1}. (   )`));
+          const opts = h('div', { class: 'pq-pc-opts' });
+          (item.options || []).forEach((opt, j) => {
+            const cell = h('div', { class: 'pq-pc-cell' });
+            cell.appendChild(h('div', { class: 'pq-pc-letter' }, String.fromCharCode(65 + j) + '.'));
+            if (opt.image?.startsWith('emoji:')) {
+              cell.appendChild(h('div', { class: 'pq-pc-emoji' }, opt.image.slice(6)));
+            } else if (opt.image) {
+              const u = resolveQuizAsset(opt.image, 'image');
+              if (u) cell.appendChild(h('img', { src: u, class: 'pq-pc-img' }));
+            } else if (opt.emoji) {
+              cell.appendChild(h('div', { class: 'pq-pc-emoji' }, opt.emoji));
+            }
+            opts.appendChild(cell);
+          });
+          row.appendChild(opts);
+          s.appendChild(row);
+        });
+      } else if (type === 'listen-match-pic') {
+        // 新: 听录音连线 · 左人名右 A-E 图
+        const item = sec.items[0];
+        if (item) {
+          const table = h('table', { class: 'pq-match' });
+          const persons = item.persons || [];
+          const targets = item.targets || [];
+          const maxRows = Math.max(persons.length, targets.length);
+          for (let i = 0; i < maxRows; i++) {
+            const tr = h('tr', {});
+            const p = persons[i];
+            const t = targets[i];
+            tr.appendChild(h('td', {}, p ? `${p.id}. ${p.name}` : ''));
+            tr.appendChild(h('td', { style: 'width:40px; text-align:center;' }, '____'));
+            const tcell = h('td', {});
+            if (t) {
+              tcell.appendChild(h('span', { style: 'font-weight:700; margin-right:6px;' }, t.id + '.'));
+              if (t.image?.startsWith('emoji:')) {
+                tcell.appendChild(h('span', { style: 'font-size:1.4rem;' }, t.image.slice(6)));
+              } else {
+                const u = resolveQuizAsset(t.image, 'image');
+                if (u) tcell.appendChild(h('img', { src: u, style: 'width:40px; height:40px; object-fit:contain; vertical-align:middle;' }));
+              }
+              if (t.label) tcell.appendChild(h('span', { style: 'margin-left:6px;' }, t.label));
+            }
+            tr.appendChild(tcell);
+            table.appendChild(tr);
+          }
+          s.appendChild(table);
+        }
+      } else if (type === 'listen-fill-choose') {
+        // 新: 听对话 · 每空 A/B 选
+        const item = sec.items[0];
+        if (item) {
+          (item.dialog || []).forEach(line => {
+            let parts = [];
+            if (line.speaker) parts.push(line.speaker + ': ');
+            (line.parts || []).forEach(p => {
+              if (p.t != null) parts.push(p.t);
+              else if (typeof p.blank === 'number') {
+                const b = item.blanks[p.blank];
+                const opts = (b.options || []).map((o, oi) => `${String.fromCharCode(65+oi)}.${o}`).join(' ');
+                parts.push(` (${p.blank + 1}) _____ [ ${opts} ] `);
+              }
+            });
+            s.appendChild(h('div', { class: 'pq-item' }, parts.join('')));
+          });
+        }
+      } else if (type === 'letter-fill') {
+        // 新: 字母前后邻居填空
+        const item = sec.items[0];
+        if (item) {
+          (item.blanks || []).forEach((b, i) => {
+            const opts = (b.options || []).map((o, oi) => `${String.fromCharCode(65+oi)}.${o}`).join('   ');
+            s.appendChild(h('div', { class: 'pq-item' },
+              `${i + 1}. (   )  ${b.before}  →  _____  →  ${b.after}     ${opts}`
+            ));
+          });
+        }
+      } else if (type === 'pic-sentence-choose') {
+        // 新: 图 + 2 句选 1
+        sec.items.forEach((item, i) => {
+          const row = h('div', { class: 'pq-ps-row' });
+          row.appendChild(h('div', { class: 'pq-ps-num' }, `${i + 1}. (   )`));
+          if (item.image?.startsWith('emoji:')) {
+            row.appendChild(h('div', { class: 'pq-ps-emoji' }, item.image.slice(6)));
+          } else {
+            const u = resolveQuizAsset(item.image, 'image');
+            if (u) row.appendChild(h('img', { src: u, class: 'pq-ps-img' }));
+          }
+          const opts = h('div', { class: 'pq-ps-opts' });
+          (item.options || []).forEach((o, j) => {
+            opts.appendChild(h('div', {}, `${String.fromCharCode(65 + j)}. ${o}`));
+          });
+          row.appendChild(opts);
+          s.appendChild(row);
+        });
+      } else if (type === 'dialog-line-fill') {
+        // 新: 对话 A-E 填整句
+        const item = sec.items[0];
+        if (item) {
+          const pool = h('div', { class: 'pq-pool' });
+          pool.appendChild(h('b', {}, '词库: '));
+          (item.pool || []).forEach(p => {
+            pool.appendChild(h('span', { style: 'margin-right:12px;' }, `${p.id}. ${p.text}`));
+          });
+          s.appendChild(pool);
+          (item.dialog || []).forEach(line => {
+            let text = (line.speaker ? line.speaker + ': ' : '');
+            if (line.text) text += line.text + ' ';
+            if (line.blank) text += `(${line.blankIdx + 1})_____`;
+            if (line.suffix) text += ' ' + line.suffix;
+            s.appendChild(h('div', { class: 'pq-item' }, text));
+          });
         }
       }
 
