@@ -3428,6 +3428,44 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
   padding: 8px 0;
   flex-shrink: 0;
 }
+/* 答案对照表 */
+.qrs-answer-table {
+  margin-top: 10px; border-top: 2px dashed var(--ink-light);
+  padding-top: 8px;
+  font-size: 0.9rem;
+}
+.qrs-answer-thead, .qrs-answer-row {
+  display: grid;
+  grid-template-columns: 50px 1fr 1fr 30px;
+  gap: 8px;
+  padding: 4px 6px;
+  align-items: center;
+  border-radius: var(--r-sm);
+}
+.qrs-answer-thead {
+  font-weight: 700; color: var(--ink-light);
+  border-bottom: 1px solid var(--ink-light);
+  margin-bottom: 4px;
+  font-size: 0.8rem;
+}
+.qrs-answer-row.qrs-ok { background: #e8f7e8; color: #1f5d1f; }
+.qrs-answer-row.qrs-no { background: #ffe7e7; color: #8a1f1f; }
+.qrs-q-cell { font-family: var(--font-en); font-weight: 700; }
+.qrs-user-cell, .qrs-correct-cell {
+  font-family: var(--font-en);
+  word-break: break-word;
+}
+.qrs-result-cell { font-weight: 700; text-align: center; font-size: 1.1rem; }
+.qrs-explain-cell {
+  grid-column: 1 / -1;
+  padding: 4px 8px;
+  background: #fff8d4;
+  border-left: 3px solid #f0b000;
+  border-radius: var(--r-sm);
+  margin-top: 4px;
+  font-family: var(--font-zh-body);
+  color: #6a4a00;
+}
 
 /* ========== 真卷新题型 CSS ========== */
 

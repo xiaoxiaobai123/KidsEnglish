@@ -2582,9 +2582,9 @@
       if (full) correctCount++;
       const itemScored = partialScore(section.type, item, user, section.pointsPerItem);
       totalScored += itemScored;
-      // 错题入库:从 audio 或 image 字段提取 sent/vocab id
-      // 原只看 item.audio,导致 pic-judge 等仅有 image 字段的题错了不入库
+      // 错题入库
       if (!full && user !== undefined && user !== null) {
+        // 1. 老逻辑:从 audio/image 提 sent/vocab id (能映射到具体词/句的入库)
         let refId = null;
         for (const field of ['audio', 'image']) {
           const v = item[field];
@@ -2594,6 +2594,8 @@
           }
         }
         if (refId) markWrong(refId);
+        // 2. 新: quiz 题本身入库 (覆盖所有题型 · 含听四/六、笔一/六 这种没 ref 的)
+        markQuizWrong(item, section, user);
       }
     });
     section.graded = true;
@@ -2618,7 +2620,9 @@
     if (type === 'listen-choose') return user === item.correct;
     if (type === 'listen-judge')  return user === item.correct;
     if (type === 'listen-pic')    return user === item.correct;
+    if (type === 'listen-pic-choose') return user === item.correct;
     if (type === 'pic-judge')     return user === item.correct;
+    if (type === 'pic-sentence-choose') return user === item.correct;
     if (type === 'odd-one-out')   return user === item.correct;
     if (type === 'scenario')      return user === item.correct;
     if (type === 'letter-neighbor') {
@@ -2629,6 +2633,22 @@
       if (!user || typeof user !== 'object') return false;
       return item.pairs.every((_, i) => user[i] === i);
     }
+    if (type === 'listen-match-pic') {
+      // user = { personId: targetId }
+      if (!user || typeof user !== 'object') return false;
+      return (item.persons || []).every(p => user[p.id] === p.expectedTarget);
+    }
+    if (type === 'listen-fill-choose' || type === 'letter-fill') {
+      // user = { blankIdx: optIdx }
+      if (!user || typeof user !== 'object') return false;
+      return (item.blanks || []).every((b, i) => user[i] === b.correct);
+    }
+    if (type === 'dialog-line-fill') {
+      // user = { blankIdx: poolId(A-E) }
+      if (!user || typeof user !== 'object') return false;
+      const ans = item.answers || {};
+      return Object.keys(ans).every(k => user[k] === ans[k]);
+    }
     if (type === 'dialog-fill' || type === 'listen-fill') {
       if (!user || typeof user !== 'object') return false;
       const blanks = [];
@@ -2637,39 +2657,175 @@
     }
     if (type === 'listen-response') return user === item.correct;
     if (type === 'listen-order') {
-      // user = { imgIdx: orderNumber(1-6) }
+      // user = { imgIdx: orderNumber }
       if (!user || typeof user !== 'object') return false;
-      return item.images.every((imgRef, imgIdx) => {
-        const expectedPos = item.sequence.indexOf(imgRef) + 1;  // 1-based
-        return user[imgIdx] === expectedPos;
+      return (item.images || []).every((img, idx) => {
+        // 支持新结构 { image, correctOrder } 和老结构 string
+        const expected = (typeof img === 'object' && img && img.correctOrder != null)
+          ? img.correctOrder
+          : (item.sequence.indexOf(typeof img === 'string' ? img : img.image) + 1);
+        return user[idx] === expected;
       });
     }
     // 其他暂未实现
     return user === item.correct;
   }
 
-  // 辅助：统计部分得分（match-columns 和 dialog-fill 按连对/填对比例给分）
+  // —— quiz 错题入库 (任何题型,即使没 sent/vocab ref) ——
+  function markQuizWrong(item, section, user) {
+    if (!item || !item.id) return;
+    const id = 'qz:' + item.id;
+    STATE.mistakeBank = STATE.mistakeBank || {};
+    const m = STATE.mistakeBank[id] || { wrong: 0 };
+    m.wrong++;
+    m.lastWrong = new Date().toISOString().slice(0, 10);
+    m.quizSnapshot = {
+      sectionTitle: section.title,
+      type: section.type,
+      item,                                     // 原题(含 explanation 字段如有)
+      userAns: user,
+      userText: formatUserAnswer(section.type, item, user),
+      correctText: formatCorrectAnswer(section.type, item),
+    };
+    STATE.mistakeBank[id] = m;
+    saveState();
+  }
+
+  // —— 答案格式化(review/错题集 显示用) ——
+  const ABCD = ['A', 'B', 'C', 'D', 'E'];
+  function formatUserAnswer(type, item, user) {
+    if (user == null || user === '') return '未答';
+    switch (type) {
+      case 'listen-choose':
+      case 'listen-response':
+      case 'listen-pic-choose':
+      case 'pic-sentence-choose':
+      case 'odd-one-out':
+      case 'scenario':
+        return ABCD[user] || String(user);
+      case 'listen-judge':
+      case 'pic-judge':
+        return user ? '✓' : '✗';
+      case 'listen-order':
+        if (typeof user !== 'object') return String(user);
+        return Object.keys(user).sort((a,b)=>+a-+b).map(k => `图${+k+1}=${user[k]}`).join(' ');
+      case 'listen-match-pic':
+        if (typeof user !== 'object') return String(user);
+        return Object.entries(user).map(([k,v]) => `${k}→${v}`).join(' ');
+      case 'listen-fill-choose':
+      case 'letter-fill':
+        if (typeof user !== 'object') return String(user);
+        return Object.keys(user).sort((a,b)=>+a-+b).map(k => `(${+k+1})${ABCD[user[k]]}`).join(' ');
+      case 'dialog-line-fill':
+        if (typeof user !== 'object') return String(user);
+        return Object.keys(user).sort((a,b)=>+a-+b).map(k => `(${+k+1})${user[k]}`).join(' ');
+      case 'match-columns':
+        if (typeof user !== 'object') return String(user);
+        return Object.entries(user).map(([k,v]) => `${+k+1}→${(item.pairs?.[v]?.a || '?')}`).join(' · ');
+      case 'dialog-fill':
+      case 'listen-fill':
+        if (typeof user !== 'object') return String(user);
+        return Object.values(user).join(' / ');
+      case 'letter-neighbor':
+        if (typeof user !== 'object') return String(user);
+        return `${user.before||'?'} ${item.letter} ${user.after||'?'}`;
+      default:
+        return String(user);
+    }
+  }
+  function formatCorrectAnswer(type, item) {
+    switch (type) {
+      case 'listen-choose':
+      case 'listen-response':
+      case 'listen-pic-choose':
+      case 'pic-sentence-choose':
+      case 'odd-one-out':
+      case 'scenario':
+        return ABCD[item.correct] || String(item.correct);
+      case 'listen-judge':
+      case 'pic-judge':
+        return item.correct ? '✓' : '✗';
+      case 'listen-order':
+        return (item.images || []).map((img, idx) => {
+          const expected = (typeof img === 'object' && img && img.correctOrder != null)
+            ? img.correctOrder
+            : (item.sequence.indexOf(typeof img === 'string' ? img : img.image) + 1);
+          return `图${idx+1}=${expected}`;
+        }).join(' ');
+      case 'listen-match-pic':
+        return (item.persons || []).map(p => `${p.id}→${p.expectedTarget}`).join(' ');
+      case 'listen-fill-choose':
+      case 'letter-fill':
+        return (item.blanks || []).map((b, i) => `(${i+1})${ABCD[b.correct]}`).join(' ');
+      case 'dialog-line-fill': {
+        const ans = item.answers || {};
+        return Object.keys(ans).sort((a,b)=>+a-+b).map(k => `(${+k+1})${ans[k]}`).join(' ');
+      }
+      case 'match-columns':
+        return (item.pairs || []).map((p, i) => `${i+1}→${p.a}`).join(' · ');
+      case 'dialog-fill':
+      case 'listen-fill': {
+        const blanks = [];
+        item.dialog.forEach(line => line.parts.forEach(p => { if (p.blank) blanks.push(p.blank); }));
+        return blanks.join(' / ');
+      }
+      case 'letter-neighbor':
+        return `${item.before} ${item.letter} ${item.after}`;
+      default:
+        return '';
+    }
+  }
+  // 取题面摘要(列表展示用)
+  function quizItemSummary(type, item) {
+    if (item.audioText) return item.audioText;
+    if (item.scene) return item.scene;
+    if (item.text) return item.text;
+    if (Array.isArray(item.items)) return item.items.join(' / ');
+    if (item.letter) return `字母: ${item.letter}`;
+    if (item.audio) return item.audio;
+    if (item.image) return item.image;
+    return item.id;
+  }
+
+  // 辅助：统计部分得分（多空题按对的空数给分）
   function partialScore(type, item, user, pointsPerItem) {
     if (type === 'match-columns') {
       if (!user) return 0;
-      const correctCount = item.pairs.reduce((n, _, i) => n + (user[i] === i ? 1 : 0), 0);
-      // 每对 2 分（pointsPerItem 是整组总分 12，对应 6 对 × 2）
-      return correctCount * 2;
+      const cnt = item.pairs.reduce((n, _, i) => n + (user[i] === i ? 1 : 0), 0);
+      return cnt * 2;
     }
     if (type === 'dialog-fill' || type === 'listen-fill') {
       if (!user) return 0;
       const blanks = [];
       item.dialog.forEach(line => line.parts.forEach(p => { if (p.blank) blanks.push(p.blank); }));
-      const correctCount = blanks.reduce((n, ans, i) => n + (user[i] === ans ? 1 : 0), 0);
-      return correctCount * 2;  // 每空 2 分
+      const cnt = blanks.reduce((n, ans, i) => n + (user[i] === ans ? 1 : 0), 0);
+      return cnt * 2;
     }
     if (type === 'listen-order') {
       if (!user) return 0;
-      const correctCount = item.images.reduce((n, imgRef, imgIdx) => {
-        const expected = item.sequence.indexOf(imgRef) + 1;
-        return n + (user[imgIdx] === expected ? 1 : 0);
+      const cnt = (item.images || []).reduce((n, img, idx) => {
+        const expected = (typeof img === 'object' && img && img.correctOrder != null)
+          ? img.correctOrder
+          : (item.sequence.indexOf(typeof img === 'string' ? img : img.image) + 1);
+        return n + (user[idx] === expected ? 1 : 0);
       }, 0);
-      return correctCount * 2;  // 每对 2 分
+      return cnt * pointsPerItem;
+    }
+    if (type === 'listen-match-pic') {
+      if (!user) return 0;
+      const cnt = (item.persons || []).filter(p => user[p.id] === p.expectedTarget).length;
+      return cnt * pointsPerItem;
+    }
+    if (type === 'listen-fill-choose' || type === 'letter-fill') {
+      if (!user) return 0;
+      const cnt = (item.blanks || []).filter((b, i) => user[i] === b.correct).length;
+      return cnt * pointsPerItem;
+    }
+    if (type === 'dialog-line-fill') {
+      if (!user) return 0;
+      const ans = item.answers || {};
+      const cnt = Object.keys(ans).filter(k => user[k] === ans[k]).length;
+      return cnt * pointsPerItem;
     }
     return isItemCorrect(type, item, user) ? pointsPerItem : 0;
   }
@@ -2808,6 +2964,31 @@
       } else {
         secWrap.appendChild(h('div', { style: 'color:#999; padding:8px;' }, '题型 ' + sec.type + ' 待支持'));
       }
+      // 答案对照表 · 每题一行 (你选 X · 标答 Y · 讲解)
+      const table = h('div', { class: 'qrs-answer-table' });
+      table.appendChild(h('div', { class: 'qrs-answer-thead' },
+        h('span', { class: 'qrs-q-cell' }, '题'),
+        h('span', { class: 'qrs-user-cell' }, '你的答案'),
+        h('span', { class: 'qrs-correct-cell' }, '标准答案'),
+        h('span', { class: 'qrs-result-cell' }, ''),
+      ));
+      sec.items.forEach((item, idx) => {
+        const userAns = sec.userAnswers[item.id];
+        const ok = isItemCorrect(sec.type, item, userAns);
+        const userT = formatUserAnswer(sec.type, item, userAns);
+        const correctT = formatCorrectAnswer(sec.type, item);
+        const row = h('div', { class: 'qrs-answer-row ' + (ok ? 'qrs-ok' : 'qrs-no') },
+          h('span', { class: 'qrs-q-cell' }, sec.items.length === 1 ? '本题' : `${idx + 1}`),
+          h('span', { class: 'qrs-user-cell' }, userT),
+          h('span', { class: 'qrs-correct-cell' }, correctT),
+          h('span', { class: 'qrs-result-cell' }, ok ? '✓' : '✗')
+        );
+        if (item.explanation) {
+          row.appendChild(h('span', { class: 'qrs-explain-cell' }, '💡 ' + item.explanation));
+        }
+        table.appendChild(row);
+      });
+      secWrap.appendChild(table);
       body.appendChild(secWrap);
     });
     shell.appendChild(body);
@@ -5204,12 +5385,15 @@
       return;
     }
 
-    // 分类：先按 id 前缀判断是句 / 词 / 字母
+    // 分类:句 / 词 / quiz 题
     const sentenceItems = [];
     const vocabItems = [];
+    const quizItems = [];
     ids.forEach(id => {
       const rec = bank[id];
-      if (typeof SENTENCES_BY_ID !== 'undefined' && SENTENCES_BY_ID[id]) {
+      if (id.startsWith('qz:') && rec.quizSnapshot) {
+        quizItems.push({ id, type: 'quiz', data: rec.quizSnapshot, rec });
+      } else if (typeof SENTENCES_BY_ID !== 'undefined' && SENTENCES_BY_ID[id]) {
         sentenceItems.push({ id, type: 'sent', data: SENTENCES_BY_ID[id], rec });
       } else if (typeof VOCAB !== 'undefined') {
         const w = [...(VOCAB.core||[]), ...(VOCAB.rhyme||[]), ...(VOCAB.alphabet||[])].find(x => x.id === id);
@@ -5218,7 +5402,7 @@
     });
 
     const summary = h('p', { class: 'review-summary' },
-      `共 ${ids.length} 道错题 · ${vocabItems.length} 个单词 + ${sentenceItems.length} 个句子。点 "我会了" 消除。`
+      `共 ${ids.length} 道错题 · ${vocabItems.length} 词 + ${sentenceItems.length} 句 + ${quizItems.length} 试卷题。点 "我会了" 消除。`
     );
     page.appendChild(summary);
 
@@ -5229,13 +5413,48 @@
     controls.appendChild(h('button', { class: 'btn btn--sm', onclick: goHome }, '🏠 主页'));
     page.appendChild(controls);
 
-    // 列表
+    // 列表 (vocab + sent + quiz)
     const list = h('div', { class: 'review-list' });
     [...vocabItems, ...sentenceItems].forEach(it => {
       list.appendChild(renderReviewCard(it));
     });
+    quizItems.forEach(it => list.appendChild(renderQuizReviewCard(it)));
     page.appendChild(list);
     screen.appendChild(page);
+  }
+
+  // 渲染 quiz 错题卡 (来自 mistakeBank quizSnapshot)
+  function renderQuizReviewCard(it) {
+    const snap = it.data;
+    const card = h('div', { class: 'review-card review-card--quiz' });
+    card.appendChild(h('div', { class: 'review-thumb review-thumb--emoji' }, '📝'));
+    const info = h('div', { class: 'review-info' });
+    info.appendChild(h('div', { class: 'review-en', style: 'font-size:0.95rem;' }, snap.sectionTitle || ''));
+    info.appendChild(h('div', { class: 'review-zh' }, '📌 ' + quizItemSummary(snap.type, snap.item)));
+    info.appendChild(h('div', { class: 'review-meta' },
+      h('span', { style: 'color:#c40;' }, '你: ' + snap.userText),
+      ' · ',
+      h('span', { style: 'color:#1f5d1f;' }, '答: ' + snap.correctText),
+    ));
+    if (snap.item.explanation) {
+      info.appendChild(h('div', { class: 'qrs-explain-cell', style: 'margin-top:6px; font-size:0.85rem;' },
+        '💡 ' + snap.item.explanation));
+    }
+    info.appendChild(h('div', { class: 'review-meta' },
+      `❌ 错 ${it.rec.wrong} 次 · 上次 ${it.rec.lastWrong || '—'}`
+    ));
+    card.appendChild(info);
+
+    const actions = h('div', { class: 'review-actions' });
+    const knowBtn = h('button', { class: 'btn btn--sm btn--mint' }, '✓ 我会了');
+    knowBtn.addEventListener('click', () => {
+      delete STATE.mistakeBank[it.id];
+      saveState();
+      renderErrorReview();
+    });
+    actions.appendChild(knowBtn);
+    card.appendChild(actions);
+    return card;
   }
 
   function renderReviewCard(it) {
