@@ -2719,22 +2719,26 @@
     const totalPossible = paper.sections.reduce((s, sec) => s + sec.items.length * sec.pointsPerItem, 0);
     const finalPct = totalPossible > 0 ? Math.round(totalScored / totalPossible * 100) : 0;
 
-    // 存进度
-    STATE.unitTests = STATE.unitTests || {};
-    const prev = STATE.unitTests[paper.unit];
-    STATE.unitTests[paper.unit] = {
-      bestScore: Math.max(prev?.bestScore || 0, finalPct),
-      lastScore: finalPct,
-      lastDate: new Date().toISOString().slice(0, 10),
-      lastTotal: totalScored,
-      lastPossible: totalPossible,
-    };
-    // 积分
-    let earned = finalPct >= 60 ? 5 : 2;
-    if (finalPct >= 90) earned += 3;
-    STATE.score += earned;
-    saveState();
-    renderTopbar();
+    // 计分 + 存进度只做一次(从 review 视图返回时不重复)
+    let earned = paper._earnedCoins || 0;
+    if (!paper._scoringDone) {
+      STATE.unitTests = STATE.unitTests || {};
+      const prev = STATE.unitTests[paper.unit];
+      STATE.unitTests[paper.unit] = {
+        bestScore: Math.max(prev?.bestScore || 0, finalPct),
+        lastScore: finalPct,
+        lastDate: new Date().toISOString().slice(0, 10),
+        lastTotal: totalScored,
+        lastPossible: totalPossible,
+      };
+      earned = finalPct >= 60 ? 5 : 2;
+      if (finalPct >= 90) earned += 3;
+      STATE.score += earned;
+      saveState();
+      renderTopbar();
+      paper._scoringDone = true;
+      paper._earnedCoins = earned;
+    }
 
     switchScreen('quiz');
     const screen = $('#screen-quiz');
@@ -2758,12 +2762,62 @@
         })
       ),
       h('div', { class: 'result-actions', style: 'margin-top: 20px;' },
+        h('button', { class: 'btn btn--lg btn--mint', onclick: renderQuizPaperReview }, '📋 查看答卷'),
         h('button', { class: 'btn btn--lg btn--pink', onclick: goHome }, '🏠 回主页'),
         h('button', { class: 'btn btn--lg btn--blue', onclick: renderQuizPicker }, '🔁 再测')
       )
     );
     screen.appendChild(page);
     spawnConfetti(finalPct >= 90 ? 80 : 30);
+  }
+
+  // —— 全卷答卷回看(对错红绿 + 标答) ——
+  function renderQuizPaperReview() {
+    const paper = QUIZ.paper;
+    if (!paper) return;
+    switchScreen('quiz');
+    const screen = $('#screen-quiz');
+    screen.innerHTML = '';
+    const shell = h('div', { class: 'quiz-shell quiz-review-shell' });
+
+    // 顶栏:标题 + 总分 + 返回
+    const totalScored = paper.sections.reduce((s, sec) => s + (sec.scored || 0), 0);
+    const totalPossible = paper.sections.reduce((s, sec) => s + sec.items.length * sec.pointsPerItem, 0);
+    shell.appendChild(h('div', { class: 'quiz-review-header' },
+      h('h2', { style: 'margin: 0; flex: 1;' }, `📋 ${paper.title} · 答卷回看`),
+      h('div', { class: 'q-progress' }, `${totalScored}/${totalPossible} 分`),
+      h('button', { class: 'btn btn--sm', onclick: () => finishQuizSession() }, '‹ 返回结果')
+    ));
+
+    // 主体 · 每 section 用 review:true 渲染
+    const body = h('div', { class: 'quiz-body quiz-review-body' });
+    paper.sections.forEach(sec => {
+      const secWrap = h('div', { class: 'quiz-review-section' });
+      const total = sec.items.length * sec.pointsPerItem;
+      const scored = sec.scored || 0;
+      const okCls = scored === total ? 'qrs-full' : (scored < total * 0.6 ? 'qrs-low' : 'qrs-mid');
+      secWrap.appendChild(h('div', { class: 'quiz-review-section-head ' + okCls },
+        h('span', { class: 'qrs-title' }, sec.title),
+        h('span', { class: 'qrs-score' }, `${scored}/${total} 分`)
+      ));
+      const renderer = QUIZ_RENDERERS[sec.type];
+      if (renderer) {
+        try { renderer(sec, secWrap, { review: true }); } catch (e) {
+          secWrap.appendChild(h('div', { style: 'color:#c40; padding:8px;' }, '渲染失败: ' + e.message));
+        }
+      } else {
+        secWrap.appendChild(h('div', { style: 'color:#999; padding:8px;' }, '题型 ' + sec.type + ' 待支持'));
+      }
+      body.appendChild(secWrap);
+    });
+    shell.appendChild(body);
+
+    // 底部:再返回
+    shell.appendChild(h('div', { class: 'quiz-review-footer' },
+      h('button', { class: 'btn btn--lg btn--pink', onclick: () => finishQuizSession() }, '‹ 返回成绩单'),
+      h('button', { class: 'btn btn--lg btn--blue', onclick: renderQuizPicker }, '🔁 再测一次')
+    ));
+    screen.appendChild(shell);
   }
 
   /* ============================================================

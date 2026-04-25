@@ -1691,7 +1691,7 @@ const QUIZ_PAPERS = {
             { id:'S1_9_02', image:'vocab:u4_flower', options:['I like flowers.','I like birds.'], correct:0 },
             { id:'S1_9_03', image:'vocab:u4_kite',   options:['Look at the bag.','Look at the kite.'], correct:1 },
             { id:'S1_9_04', image:'vocab:u3_pea',    options:['It is a pepper.','It is a pea.'], correct:1 },
-            { id:'S1_9_05', image:'emoji:🌸🌸🌸🌸🌸', options:['Five flowers.','Three flowers.'], correct:0 },
+            { id:'S1_9_05', image:'vocab:u4_tree', options:['The tree is green.','The tree is red.'], correct:0 },
           ]},
 
         /* 笔试四、情景(5 题 2 选) */
