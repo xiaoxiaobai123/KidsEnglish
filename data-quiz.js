@@ -1540,9 +1540,9 @@ const QUIZ_PAPERS = {
             { id:'S1_1_03', audioText:'Look at the bird!',
               options:[{ image:'vocab:u3_pea', label:'pea' },{ image:'vocab:u3_carrot', label:'carrot' },{ image:'vocab:u4_bird', label:'bird' }], correct:2 },
             { id:'S1_1_04', audioText:'Two peppers, please.',
-              options:[{ emoji:'🌶️🌶️', label:'2 peppers' },{ emoji:'🥕🥕🥕', label:'3 carrots' },{ emoji:'🧅🧅', label:'2 onions' }], correct:0 },
+              options:[{ image:'quiz:u3u4_2peppers', label:'2 peppers' },{ image:'quiz:u3u4_3carrots', label:'3 carrots' },{ image:'quiz:u3u4_2onions', label:'2 onions' }], correct:0 },
             { id:'S1_1_05', audioText:'How many kites? Three.',
-              options:[{ emoji:'🪁', label:'1 kite' },{ emoji:'🪁🪁', label:'2 kites' },{ emoji:'🪁🪁🪁', label:'3 kites' }], correct:2 },
+              options:[{ image:'quiz:u3u4_1kite', label:'1 kite' },{ emoji:'🪁🪁', label:'2 kites' },{ image:'quiz:u3u4_3kites', label:'3 kites' }], correct:2 },
           ]},
 
         /* 二、听录音排序(5 图 · 答案分布 3-5-4-2-1) */
@@ -1562,7 +1562,7 @@ const QUIZ_PAPERS = {
               { image:'vocab:u3_pepper', correctOrder:3 },
               { image:'vocab:u4_kite',   correctOrder:5 },
               { image:'emoji:🧅🧅🧅',    correctOrder:4 },
-              { image:'emoji:🍒',         correctOrder:2 },
+              { image:'quiz:u3u4_cherries',         correctOrder:2 },
               { image:'vocab:u4_flower', correctOrder:1 },
             ],
           }],
@@ -1687,7 +1687,7 @@ const QUIZ_PAPERS = {
           title:'三、根据图片内容,选择合适的句子', titleEn:'Pick the matching sentence',
           hint:'看图 → 选出描述正确的英文句子', pointsPerItem:1,
           items:[
-            { id:'S1_9_01', image:'emoji:🥕🥕',       options:['Two carrots.','Three carrots.'], correct:0 },
+            { id:'S1_9_01', image:'quiz:u3u4_2carrots',       options:['Two carrots.','Three carrots.'], correct:0 },
             { id:'S1_9_02', image:'vocab:u4_flower', options:['I like flowers.','I like birds.'], correct:0 },
             { id:'S1_9_03', image:'vocab:u4_kite',   options:['Look at the bag.','Look at the kite.'], correct:1 },
             { id:'S1_9_04', image:'vocab:u3_pea',    options:['It is a pepper.','It is a pea.'], correct:1 },
@@ -1774,11 +1774,11 @@ const QUIZ_PAPERS = {
           hint:'听录音 → 点对应的图', pointsPerItem:2,
           items:[
             { id:'S2_1_01', audioText:'I like cherries.',
-              options:[{ emoji:'🍌', label:'bananas' },{ emoji:'🍎', label:'apples' },{ emoji:'🍒', label:'cherries' }], correct:2 },
+              options:[{ image:'quiz:u3u4_bananas', label:'bananas' },{ emoji:'🍎', label:'apples' },{ image:'quiz:u3u4_cherries', label:'cherries' }], correct:2 },
             { id:'S2_1_02', audioText:'The flower is yellow.',
               options:[{ image:'vocab:u4_flower', label:'flower' },{ image:'vocab:u4_tree', label:'tree' },{ image:'vocab:u4_bird', label:'bird' }], correct:0 },
             { id:'S2_1_03', audioText:'How many onions? Four.',
-              options:[{ emoji:'🧅🧅', label:'2 onions' },{ emoji:'🧅🧅🧅🧅', label:'4 onions' },{ emoji:'🧅🧅🧅', label:'3 onions' }], correct:1 },
+              options:[{ image:'quiz:u3u4_2onions', label:'2 onions' },{ emoji:'🧅🧅🧅🧅', label:'4 onions' },{ emoji:'🧅🧅🧅', label:'3 onions' }], correct:1 },
             { id:'S2_1_04', audioText:'A carrot, please.',
               options:[{ image:'vocab:u3_carrot', label:'carrot' },{ image:'vocab:u3_pea', label:'pea' },{ image:'vocab:u3_pepper', label:'pepper' }], correct:0 },
             { id:'S2_1_05', audioText:'Look! A green tree.',
@@ -1802,7 +1802,7 @@ const QUIZ_PAPERS = {
               { image:'vocab:u3_pepper', correctOrder:4 },
               { image:'vocab:u4_bird',   correctOrder:1 },
               { image:'vocab:u4_flower', correctOrder:5 },
-              { image:'emoji:🍒',         correctOrder:2 },
+              { image:'quiz:u3u4_cherries',         correctOrder:2 },
               { image:'vocab:u4_kite',   correctOrder:3 },
             ],
           }],
@@ -1928,7 +1928,7 @@ const QUIZ_PAPERS = {
           items:[
             { id:'S2_9_01', image:'emoji:🧅🧅🧅🧅',  options:['Three onions.','Four onions.'], correct:1 },
             { id:'S2_9_02', image:'vocab:u4_bird',    options:['Look! The birds are happy.','Look! The trees are green.'], correct:0 },
-            { id:'S2_9_03', image:'emoji:🐵🥕',       options:['I like bananas.','I like carrots.'], correct:1 },
+            { id:'S2_9_03', image:'quiz:u3u4_monkey_carrot',       options:['I like bananas.','I like carrots.'], correct:1 },
             { id:'S2_9_04', image:'vocab:u3_pea',     options:['The peas are green.','The peas are red.'], correct:0 },
             { id:'S2_9_05', image:'vocab:u4_kite',    options:['This is my bag.','This is my kite.'], correct:1 },
           ]},
@@ -2022,8 +2022,8 @@ const QUIZ_PAPERS = {
             { id:'R1_01', audioText:'I like onions.',
               options:[
                 { image:'vocab:u3_onion',  label:'onions' },
-                { emoji:'🍌',               label:'bananas' },
-                { emoji:'🍇',               label:'grapes' },
+                { image:'quiz:u3u4_bananas',               label:'bananas' },
+                { image:'quiz:u3u4_grapes',               label:'grapes' },
               ], correct:0 },
             { id:'R1_02', audioText:'The flowers are beautiful.',
               options:[
@@ -2039,13 +2039,13 @@ const QUIZ_PAPERS = {
               ], correct:2 },
             { id:'R1_04', audioText:'How many birds? Three birds.',
               options:[
-                { emoji:'🐦',       label:'one bird' },
-                { emoji:'🐦🐦',     label:'two birds' },
+                { image:'quiz:u3u4_1bird',       label:'one bird' },
+                { image:'quiz:u3u4_2birds',     label:'two birds' },
                 { emoji:'🐦🐦🐦',   label:'three birds' },
               ], correct:2 },
             { id:'R1_05', audioText:'Two carrots, please.',
               options:[
-                { emoji:'🥕🥕',             label:'two carrots' },
+                { image:'quiz:u3u4_2carrots',             label:'two carrots' },
                 { image:'vocab:u3_pepper', label:'peppers' },
                 { emoji:'🍒🍒',             label:'cherries' },
               ], correct:0 },
@@ -2069,9 +2069,9 @@ const QUIZ_PAPERS = {
             images:[
               { image:'vocab:u3_pea',   correctOrder:4 },  // 图 1 · 对应对话 4 (peas)
               { image:'vocab:u3_onion', correctOrder:3 },  // 图 2 · 对应对话 3 (onions)
-              { image:'emoji:🍇',        correctOrder:5 },  // 图 3 · 对应对话 5 (grapes 拒绝)
+              { image:'quiz:u3u4_grapes',        correctOrder:5 },  // 图 3 · 对应对话 5 (grapes 拒绝)
               { image:'vocab:u4_kite',  correctOrder:1 },  // 图 4 · 对应对话 1 (kites)
-              { image:'emoji:🐕',        correctOrder:2 },  // 图 5 · 对应对话 2 (puppies)
+              { image:'quiz:u3u4_puppy',        correctOrder:2 },  // 图 5 · 对应对话 2 (puppies)
             ],
           }],
         },
@@ -2088,10 +2088,10 @@ const QUIZ_PAPERS = {
               image:'vocab:u4_flower',    correct:false },   // 图花,听豌豆
             { id:'R3_02', audio:'',
               audioText:'Cherries? Yes, please. I like cherries.',
-              image:'emoji:🍒',           correct:true },
+              image:'quiz:u3u4_cherries',           correct:true },
             { id:'R3_03', audio:'',
               audioText:'A robot? No, thanks.',
-              image:'emoji:🤖',           correct:false },   // 图机器人 + 对话拒绝 = 不符(按真卷答案)
+              image:'quiz:u3u4_robot',           correct:false },   // 图机器人 + 对话拒绝 = 不符(按真卷答案)
             { id:'R3_04', audio:'',
               audioText:'Look at the flowers. They are happy.',
               image:'vocab:u4_flower',    correct:true },
@@ -2198,7 +2198,7 @@ const QUIZ_PAPERS = {
             ],
             targets:[
               { id:'A', image:'vocab:u4_flower', label:'flowers' },
-              { id:'B', image:'emoji:🧸',         label:'teddy' },
+              { id:'B', image:'quiz:u3u4_teddy',         label:'teddy' },
               { id:'C', image:'vocab:u4_tree',    label:'tree' },
               { id:'D', image:'vocab:u3_carrot',  label:'carrots' },
               { id:'E', image:'vocab:u4_bird',    label:'birds' },
@@ -2265,9 +2265,9 @@ const QUIZ_PAPERS = {
               options:['Two onions.','Three onions.'], correct:1 },
             { id:'W3_02', image:'vocab:u4_kite',
               options:['Look! The kites are beautiful.','Look! The birds are beautiful.'], correct:0 },
-            { id:'W3_03', image:'emoji:🐵🥕',
+            { id:'W3_03', image:'quiz:u3u4_monkey_carrot',
               options:['I like carrots.','I like bananas.'], correct:0 },
-            { id:'W3_04', image:'emoji:🎒',
+            { id:'W3_04', image:'quiz:u3u4_bag',
               options:['This is my book.','This is my bag.'], correct:1 },
             { id:'W3_05', image:'vocab:u3_pea',
               options:['The peas are green.','The trees are red.'], correct:0 },
