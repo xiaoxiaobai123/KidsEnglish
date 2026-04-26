@@ -14,7 +14,7 @@
  *   中间网挂也没事,下次打开接着下
  * ============================================================ */
 
-const VERSION = '20260424a';
+const VERSION = '20260425b';
 const CACHE_NAME = `englishkids-${VERSION}`;
 
 // 核心文件(小,一定要下,install 阻塞直到完成)
@@ -27,6 +27,7 @@ const CORE_FILES = [
   './data-sentences.js',
   './data-coach.js',
   './data-quiz.js',
+  './data-mock-u3.js',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',

@@ -5100,6 +5100,7 @@
       { id: 'flashcards', title: '📇 词卡', desc: '每单元 8 词/张 · 图+英+中',     render: renderPrintFlashcards },
       { id: 'dictation',  title: '✏️ 默写表', desc: '听音默写 · 大空格 · 家长批改栏', render: renderPrintDictation },
       { id: 'quiz',       title: '📝 模拟试卷', desc: '仿真考卷 · 12 大题 · 可打印',  render: renderPrintQuiz },
+      { id: 'mock-u3',    title: '🎯 U3 真题模拟', desc: 'A 卷 / B 卷 · 100 分 · 含答案 · 可打印', render: renderPickMockU3, noUnit: true },
       { id: 'errors',     title: '🔁 错题集',   desc: '当前错题汇总 · 带答案',        render: renderPrintErrors },
     ];
     const grid = h('div', { style: 'display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 24px;' });
@@ -5120,6 +5121,8 @@
   }
 
   function openPrintUnitPicker(template) {
+    // 不需要选单元的模板(如 U3 真题、错题集)直接调
+    if (template.noUnit) { template.render(); return; }
     const m = modal(h('div', {},
       h('h3', {}, `${template.title} · 选单元`),
       (() => {
@@ -5329,6 +5332,290 @@
     });
 
     printWrap(body, `${paper.title} · 试卷`);
+  }
+
+  /* ============================================================
+   * 模板 3.5 · U3 真题模拟卷 (A 卷 / B 卷,固定题目,带答案)
+   * ============================================================ */
+  function renderPickMockU3() {
+    if (typeof MOCK_PAPERS_U3 === 'undefined') { toast('真题数据未加载'); return; }
+    const m = modal(h('div', {},
+      h('h3', {}, '🎯 U3 真题模拟 · 选试卷'),
+      h('p', { style:'color:var(--ink-light); margin: 8px 0 16px;' }, '两套全 12 大题,100 分制,固定题目可批改。'),
+      (() => {
+        const grid = h('div', { style:'display:grid; grid-template-columns: 1fr 1fr; gap: 12px;' });
+        ['A','B'].forEach(code => {
+          const p = MOCK_PAPERS_U3[code];
+          const card = h('div', { class:'menu-tile menu-tile--mint', style:'min-height:120px; cursor:pointer; padding:12px;' },
+            h('div', { class:'title' }, `${code} 卷`),
+            h('div', { class:'sub', style:'font-size:0.8rem; line-height:1.4;' }, p.subtitle)
+          );
+          card.addEventListener('click', () => { m.close(); renderPrintMockU3(code); });
+          grid.appendChild(card);
+        });
+        return grid;
+      })(),
+      h('div', { class:'modal-footer' }, h('button', { class:'btn', onclick:()=>m.close() }, '取消'))
+    ));
+  }
+
+  function renderPrintMockU3(code) {
+    const paper = MOCK_PAPERS_U3 && MOCK_PAPERS_U3[code];
+    if (!paper) { toast('试卷未找到'); return; }
+
+    const body = h('div', { class:'print-quiz print-mock' });
+
+    // —— 标题区 ——
+    body.appendChild(h('h2', { class:'pq-title' }, paper.title));
+    body.appendChild(h('p', { class:'pq-subtitle' }, paper.subtitle));
+    body.appendChild(h('div', { class:'pq-meta' },
+      h('span', {}, '姓名:____________'),
+      h('span', {}, '班级:____________'),
+      h('span', {}, '日期:____________'),
+      h('span', {}, '得分:_____ / 100')
+    ));
+
+    // —— 各大题渲染 ——
+    paper.sections.forEach(sec => {
+      const total = sec.items.reduce((s, it) => {
+        // 多空/排序题:按 pointsPerItem 计 1 项;选择题:每题 pointsPerItem
+        if (sec.type === 'listen-fill' || sec.type === 'dialog-fill') {
+          let blanks = 0;
+          (it.dialog || []).forEach(line => line.parts.forEach(p => p.blank && blanks++));
+          return s + blanks * sec.pointsPerItem;
+        }
+        if (sec.type === 'match-columns') return s + (it.pairs || []).length * sec.pointsPerItem;
+        return s + sec.pointsPerItem;
+      }, 0);
+
+      const s = h('div', { class:'pq-section' });
+      s.appendChild(h('h3', {}, `${sec.title}  (共 ${total} 分)`));
+      if (sec.hint) s.appendChild(h('p', { class:'pq-hint' }, sec.hint));
+
+      renderMockSectionBody(sec, s);
+      body.appendChild(s);
+    });
+
+    // —— 答案页(打印 + 屏幕都有,可折叠) ——
+    body.appendChild(buildMockAnswerKey(paper));
+
+    printMockWrap(body, paper);
+  }
+
+  function renderMockSectionBody(sec, s) {
+    const type = sec.type;
+
+    if (type === 'listen-choose' || type === 'listen-response') {
+      sec.items.forEach((item, i) => {
+        s.appendChild(h('div', { class:'pq-item' },
+          `${i + 1}. (    )  `,
+          (item.options || []).map((opt, j) =>
+            h('span', { class:'pq-opt' }, `${String.fromCharCode(65 + j)}. ${opt}`)
+          )
+        ));
+      });
+
+    } else if (type === 'listen-judge' || type === 'pic-judge') {
+      const row = h('div', { class:'pq-judge-row' });
+      sec.items.forEach((item, i) => {
+        const cell = h('div', { class:'pq-judge-cell' });
+        cell.appendChild(h('div', { class:'pq-judge-num' }, `${i + 1}.`));
+        const imgUrl = resolveQuizAsset(item.image, 'image');
+        if (imgUrl) cell.appendChild(h('img', { src: imgUrl, class:'pq-judge-img' }));
+        if (item.text) cell.appendChild(h('div', { class:'pq-judge-text' }, item.text));
+        cell.appendChild(h('div', { class:'pq-judge-box' }, '(      )'));
+        row.appendChild(cell);
+      });
+      s.appendChild(row);
+
+    } else if (type === 'odd-one-out') {
+      sec.items.forEach((item, i) => {
+        s.appendChild(h('div', { class:'pq-item' },
+          `${i + 1}. (    )  `,
+          (item.items || []).map((x, j) =>
+            h('span', { class:'pq-opt' }, `${String.fromCharCode(65 + j)}. ${x}`)
+          )
+        ));
+      });
+
+    } else if (type === 'scenario') {
+      sec.items.forEach((item, i) => {
+        s.appendChild(h('div', { class:'pq-item' },
+          h('div', {}, `${i + 1}. ${item.scene}  (    )`),
+          h('div', { style:'margin-left:24px;' },
+            (item.options || []).map((opt, j) =>
+              h('span', { class:'pq-opt' }, `${String.fromCharCode(65 + j)}. ${opt}`)
+            )
+          )
+        ));
+      });
+
+    } else if (type === 'letter-neighbor') {
+      const row = h('div', { class:'pq-letter-row' });
+      sec.items.forEach((item, i) => {
+        row.appendChild(h('div', { class:'pq-letter-cell' },
+          h('span', { class:'pq-letter-num' }, `${i + 1}.`),
+          h('span', { class:'pq-letter-blank' }, '_____'),
+          h('span', { class:'pq-letter-mid' }, item.letter),
+          h('span', { class:'pq-letter-blank' }, '_____')
+        ));
+      });
+      s.appendChild(row);
+
+    } else if (type === 'match-columns') {
+      const item = sec.items[0];
+      if (item) {
+        // 稳定打乱:基于 item.id 做种子的 Fisher-Yates,同一试卷打开两次结果一致
+        const aShuffle = seededShuffle(item.pairs.map((_, i) => i), String(item.id || 'sec' + sec.id));
+        const tbl = h('table', { class:'pq-match' });
+        item.pairs.forEach((p, i) => {
+          tbl.appendChild(h('tr', {},
+            h('td', { style:'width:48%;' }, `${i + 1}. ${p.q}  (    )`),
+            h('td', { style:'width:4%;' }, ''),
+            h('td', { style:'width:48%;' }, `${String.fromCharCode(65 + i)}. ${item.pairs[aShuffle[i]].a}`)
+          ));
+        });
+        // 把答案映射存到 section 上,答案页用
+        sec._matchShuffle = aShuffle;
+        s.appendChild(tbl);
+      }
+
+    } else if (type === 'dialog-fill' || type === 'listen-fill') {
+      const item = sec.items[0];
+      if (item) {
+        if (item.pool) {
+          s.appendChild(h('div', { class:'pq-pool' }, '词库:  ' + item.pool.join('  /  ')));
+        }
+        item.dialog.forEach(line => {
+          const lineDiv = h('div', { class:'pq-item' });
+          let html = `<b>${line.speaker}:</b>  `;
+          line.parts.forEach(p => {
+            if (p.t) html += escHtml(p.t);
+            else if (p.blank) html += '<span class="pq-blank">_______</span>';
+          });
+          lineDiv.innerHTML = html;
+          s.appendChild(lineDiv);
+        });
+      }
+
+    } else if (type === 'listen-order') {
+      const item = sec.items[0];
+      if (item) {
+        const grid = h('div', { class:'pq-order-grid' });
+        item.images.forEach((imgRef, idx) => {
+          const cell = h('div', { class:'pq-order-cell' });
+          const imgUrl = resolveQuizAsset(imgRef, 'image');
+          if (imgUrl) cell.appendChild(h('img', { src: imgUrl, class:'pq-order-img' }));
+          cell.appendChild(h('div', { class:'pq-order-num-box' }, `(    )`));
+          grid.appendChild(cell);
+        });
+        s.appendChild(grid);
+      }
+    }
+  }
+
+  function buildMockAnswerKey(paper) {
+    const wrap = h('div', { class:'pq-answers', id:'mock-answer-key' });
+    wrap.appendChild(h('h3', { class:'pq-ans-title' }, '★ 参考答案 / Answer Key'));
+    paper.sections.forEach(sec => {
+      const sec2 = h('div', { class:'pq-ans-section' });
+      sec2.appendChild(h('div', { class:'pq-ans-h' }, sec.title));
+
+      if (sec.type === 'match-columns') {
+        const item = sec.items[0];
+        const shuffle = sec._matchShuffle || sec.items[0].pairs.map((_, i) => i);
+        // 左 i 题对应右 shuffle.indexOf(i) 的字母
+        const list = item.pairs.map((p, i) => {
+          const letter = String.fromCharCode(65 + shuffle.indexOf(i));
+          return `${i + 1}. ${letter}`;
+        }).join('  ·  ');
+        sec2.appendChild(h('div', { class:'pq-ans-line' }, list));
+      } else if (sec.type === 'listen-order') {
+        const item = sec.items[0];
+        const ans = item.images.map((imgRef, i) => {
+          const pos = item.sequence.indexOf(imgRef) + 1;
+          return `图${i + 1}→${pos}`;
+        }).join('  ·  ');
+        sec2.appendChild(h('div', { class:'pq-ans-line' }, ans));
+      } else if (sec.type === 'dialog-fill' || sec.type === 'listen-fill') {
+        const item = sec.items[0];
+        const blanks = [];
+        item.dialog.forEach(line => line.parts.forEach(p => p.blank && blanks.push(p.blank)));
+        sec2.appendChild(h('div', { class:'pq-ans-line' }, blanks.map((b, i) => `${i + 1}. ${b}`).join('  ·  ')));
+      } else if (sec.type === 'letter-neighbor') {
+        const txt = sec.items.map((it, i) => `${i + 1}. ${it.before}-${it.letter}-${it.after}`).join('  ·  ');
+        sec2.appendChild(h('div', { class:'pq-ans-line' }, txt));
+      } else {
+        const ans = sec.items.map((it, i) => {
+          const a = (typeof getMockAnswerString === 'function') ? getMockAnswerString(sec, it) : '?';
+          return `${i + 1}. ${a}`;
+        }).join('  ·  ');
+        sec2.appendChild(h('div', { class:'pq-ans-line' }, ans));
+      }
+      wrap.appendChild(sec2);
+    });
+    return wrap;
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function hashStr(s) {
+    // FNV-1a 变体,短字符串也散得开
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return Math.abs(h | 0);
+  }
+  // 种子可重现的 Fisher-Yates 打乱
+  function seededShuffle(arr, seedStr) {
+    const out = arr.slice();
+    let seed = hashStr(String(seedStr));
+    function next() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed; }
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = next() % (i + 1);
+      [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out;
+  }
+
+  // —— Mock 试卷专用 wrap:工具栏多 2 个按钮 (隐藏答案 / 打印试卷版) ——
+  function printMockWrap(bodyNode, paper) {
+    const screen = $('#screen-print');
+    screen.innerHTML = '';
+    const page = h('div', { class:'print-page' });
+
+    let answersHidden = false;
+    const toolbar = h('div', { class:'print-toolbar no-print' });
+    toolbar.appendChild(h('button', { class:'btn btn--sm', onclick: renderPrintCenter }, '‹ 换模板'));
+    toolbar.appendChild(h('button', { class:'btn btn--sm', onclick: renderPickMockU3 }, '🔁 换试卷'));
+    toolbar.appendChild(h('h3', { style:'flex:1; text-align:center; margin:0;' }, paper.title));
+
+    const toggleBtn = h('button', { class:'btn btn--sm btn--mint' }, '👁 隐藏答案');
+    toggleBtn.addEventListener('click', () => {
+      answersHidden = !answersHidden;
+      const ak = bodyNode.querySelector('#mock-answer-key');
+      if (ak) ak.style.display = answersHidden ? 'none' : '';
+      toggleBtn.textContent = answersHidden ? '👁 显示答案' : '👁 隐藏答案';
+    });
+    toolbar.appendChild(toggleBtn);
+
+    const printBlankBtn = h('button', { class:'btn btn--sm btn--coral' }, '🖨️ 打印试卷版');
+    printBlankBtn.addEventListener('click', () => {
+      bodyNode.classList.add('print-blank');
+      window.print();
+      // 等下一个事件循环再恢复,避免 afterprint 兼容问题
+      setTimeout(() => bodyNode.classList.remove('print-blank'), 1500);
+    });
+    toolbar.appendChild(printBlankBtn);
+
+    toolbar.appendChild(h('button', { class:'btn btn--lg btn--pink', onclick: () => window.print() }, '🖨️ 打印答案版'));
+
+    page.appendChild(toolbar);
+    page.appendChild(h('div', { class:'print-sheet' }, bodyNode));
+    screen.appendChild(page);
   }
 
   // —— 模板 4: 错题集 ——
