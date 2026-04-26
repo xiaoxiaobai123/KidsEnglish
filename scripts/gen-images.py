@@ -195,7 +195,7 @@ SENTENCE_PROMPTS = {
     "s_u1_05": "a single small green tree with child pointing at it, cartoon",
     "s_u1_06": "six wooden sticks laid side by side, six sticks only, no labels, no numbers, no text, cartoon",
     "s_u1_07": "a cheerful boy raising his right hand high with open palm facing the camera, all five fingers fully extended and clearly visible including thumb index middle ring and pinky, big happy smile, cartoon",
-    "s_u1_08": "a wicker basket holding three red apples on top, three apples only, clean white background, no labels, no numbers, no text, cartoon",
+    "s_u1_08": "three red apples sitting side by side in a single row on a wooden table, three separated apples in a row not in a basket, three individual apples each with green stem and leaf, clean white background, no labels, no numbers, no text, cartoon",
 
     # Unit 2
     "s_u2_01": "a kid proudly showing a yellow pencil, cartoon",

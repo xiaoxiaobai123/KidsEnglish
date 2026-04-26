@@ -1506,6 +1506,839 @@ function sampleQuizItems(bank, n) {
   return shuffled.slice(0, n);
 }
 
+/* ================================================================
+ * QUIZ_PAPERS · 固定三套试卷(高质量 · 答案位置错开 · 应试+长远)
+ * --------------------------------------------------------------
+ * 结构: QUIZ_PAPERS[unit] = [paperA, paperB, paperC]
+ *   每 paper: { id, title, subtitle, sections: [...] }
+ * 和 QUIZ_BANKS 并列:
+ *   - 练习模式 → generateQuizPaper (从 bank 随机抽)
+ *   - 模拟考 → generatePaperById (固定 paper)
+ * ================================================================ */
+
+const QUIZ_PAPERS = {
+
+  /* ============ Unit 3 · I like carrots · 三套试卷 ============ */
+  3: [
+
+    /* ─────────────── 仿真卷 1 · 基于真卷风格 · 词汇稍易 ─────────────── */
+    {
+      id: 'u3_paperSim1',
+      title: '仿真卷 1 · U3-U4',
+      subtitle: '贴合真卷 · 难度略基础',
+      totalPoints: 100,
+      sections: [
+        /* 一、听录音选图(5 题 3 选) */
+        { id:1, type:'listen-pic-choose',
+          title:'一、听录音,选出与所听内容相符的图片(听两遍)', titleEn:'Listen and choose',
+          hint:'听录音 → 点对应的图', pointsPerItem:2,
+          items:[
+            { id:'S1_1_01', audioText:'I like peas.',
+              options:[{ image:'vocab:u3_pea', label:'pea' },{ image:'vocab:u3_pepper', label:'pepper' },{ emoji:'🍎', label:'apple' }], correct:0 },
+            { id:'S1_1_02', audioText:'The tree is green.',
+              options:[{ image:'vocab:u4_flower', label:'flower' },{ image:'vocab:u4_tree', label:'tree' },{ image:'vocab:u4_kite', label:'kite' }], correct:1 },
+            { id:'S1_1_03', audioText:'Look at the bird!',
+              options:[{ image:'vocab:u3_pea', label:'pea' },{ image:'vocab:u3_carrot', label:'carrot' },{ image:'vocab:u4_bird', label:'bird' }], correct:2 },
+            { id:'S1_1_04', audioText:'Two peppers, please.',
+              options:[{ image:'quiz:u3u4_2peppers', label:'2 peppers' },{ image:'quiz:u3u4_3carrots', label:'3 carrots' },{ image:'quiz:u3u4_2onions', label:'2 onions' }], correct:0 },
+            { id:'S1_1_05', audioText:'How many kites? Three.',
+              options:[{ image:'quiz:u3u4_1kite', label:'1 kite' },{ emoji:'🪁🪁', label:'2 kites' },{ image:'quiz:u3u4_3kites', label:'3 kites' }], correct:2 },
+          ]},
+
+        /* 二、听录音排序(5 图 · 答案分布 3-5-4-2-1) */
+        { id:2, type:'listen-order',
+          title:'二、听录音,根据所听内容用数字给下列图片排序(听两遍)', titleEn:'Listen and order',
+          hint:'听 5 段对话 → 点图下数字 1-5 标顺序', pointsPerItem:2,
+          items:[{
+            id:'S1_2_01',
+            sequence:[
+              { audioText:'Look at the flowers. They are beautiful.' },
+              { audioText:'Cherries? Yes, please.' },
+              { audioText:'I like peppers. Me too.' },
+              { audioText:'How many onions? Three onions.' },
+              { audioText:'Look at the kite! It is colourful.' },
+            ],
+            images:[
+              { image:'vocab:u3_pepper', correctOrder:3 },
+              { image:'vocab:u4_kite',   correctOrder:5 },
+              { image:'emoji:🧅🧅🧅',    correctOrder:4 },
+              { image:'quiz:u3u4_cherries',         correctOrder:2 },
+              { image:'vocab:u4_flower', correctOrder:1 },
+            ],
+          }],
+        },
+
+        /* 三、听录音判断图片 T/F(5 题 · 答案 √ × √ × √) */
+        { id:3, type:'listen-judge',
+          title:'三、听录音,判断下列图片是(√)否(×)与所听内容相符(听两遍)', titleEn:'Listen and judge',
+          hint:'听 → 看图 → 相符 ✓ 不符 ✗', pointsPerItem:2,
+          items:[
+            { id:'S1_3_01', audio:'', audioText:'I like carrots.',
+              image:'vocab:u3_carrot', correct:true },
+            { id:'S1_3_02', audio:'', audioText:'The birds are happy.',
+              image:'vocab:u4_kite',   correct:false },
+            { id:'S1_3_03', audio:'', audioText:'A pea? No, thanks.',
+              image:'vocab:u3_pea',    correct:true },
+            { id:'S1_3_04', audio:'', audioText:'Look! The flowers.',
+              image:'vocab:u4_tree',   correct:false },
+            { id:'S1_3_05', audio:'', audioText:"It's a pepper.",
+              image:'vocab:u3_pepper', correct:true },
+          ]},
+
+        /* 四、人 → 物连线(5 对) */
+        { id:4, type:'listen-match-pic',
+          title:'四、听录音,将左右两边相关联的图片用线连起来(听两遍)', titleEn:'Listen and match',
+          hint:'点🔊听人物自我介绍 → 点 A-E 对应物品', pointsPerItem:2,
+          items:[{
+            id:'S1_4_01',
+            persons:[
+              { id:1, name:'Su Hai',    face:'emoji:👧',     audioText:'Hello, I am Su Hai. I like flowers.',      expectedTarget:'D' },
+              { id:2, name:'Wang Bing', face:'emoji:🧑',     audioText:'Hi. I am Wang Bing. I can fly kites.',     expectedTarget:'B' },
+              { id:3, name:'Yang Ling', face:'emoji:👱‍♀️',  audioText:'Hello. I am Yang Ling. I like peas.',     expectedTarget:'E' },
+              { id:4, name:'Liu Tao',   face:'emoji:👦',     audioText:'Good morning. I am Liu Tao. Look at the bird.', expectedTarget:'C' },
+              { id:5, name:'Miss Li',   face:'emoji:👩‍🏫',   audioText:'I am Miss Li. I like red peppers.',       expectedTarget:'A' },
+            ],
+            targets:[
+              { id:'A', image:'vocab:u3_pepper', label:'pepper' },
+              { id:'B', image:'vocab:u4_kite',   label:'kite' },
+              { id:'C', image:'vocab:u4_bird',   label:'bird' },
+              { id:'D', image:'vocab:u4_flower', label:'flowers' },
+              { id:'E', image:'vocab:u3_pea',    label:'pea' },
+            ],
+          }],
+        },
+
+        /* 五、听问句选答句(5 题 2 选) */
+        { id:5, type:'listen-response',
+          title:'五、听录音,选择合适的答语(听两遍)', titleEn:'Listen and choose response',
+          hint:'听 → 选最合适的英文答句', pointsPerItem:2,
+          items:[
+            { id:'S1_5_01', audio:'', audioText:'Do you like carrots?',
+              options:['Me too.','Yes, I do.'],              correct:1 },
+            { id:'S1_5_02', audio:'', audioText:'Look at the kite.',
+              options:['It is beautiful.','Thank you.'],     correct:0 },
+            { id:'S1_5_03', audio:'', audioText:'Onions?',
+              options:['Yes, please.','Three books.'],       correct:0 },
+            { id:'S1_5_04', audio:'', audioText:'How many trees?',
+              options:['Green trees.','Five trees.'],        correct:1 },
+            { id:'S1_5_05', audio:'', audioText:'The flowers are nice.',
+              options:['Sorry.','Thank you.'],               correct:1 },
+          ]},
+
+        /* 六、听对话每空 A/B 选(5 空) */
+        { id:6, type:'listen-fill-choose',
+          title:'六、听录音,选择合适的单词完成对话(听两遍)', titleEn:'Listen and fill',
+          hint:'先听完整段 → 每个空 A/B 选', pointsPerItem:2,
+          items:[{
+            id:'S1_6_01', audio:'',
+            audioText:"M: Look at the spring! W: Spring is beautiful. M: Look at the flowers. W: They are beautiful. M: And the trees? W: The trees are green. M: Look at the birds. W: They are happy. M: I like spring. W: Me too.",
+            dialog:[
+              { speaker:'M', parts:[{t:'Look at the spring!'}] },
+              { speaker:'W', parts:[{t:'Spring is '},{blank:0},{t:'.'}] },
+              { speaker:'M', parts:[{t:'Look at the flowers.'}] },
+              { speaker:'W', parts:[{t:'They are '},{blank:1},{t:'.'}] },
+              { speaker:'M', parts:[{t:'And the trees?'}] },
+              { speaker:'W', parts:[{t:'The trees are '},{blank:2},{t:'.'}] },
+              { speaker:'M', parts:[{t:'Look at the birds.'}] },
+              { speaker:'W', parts:[{t:'They are '},{blank:3},{t:'.'}] },
+              { speaker:'M', parts:[{t:'I like spring.'}] },
+              { speaker:'W', parts:[{t:'Me '},{blank:4},{t:'.'}] },
+            ],
+            blanks:[
+              { options:['happy','beautiful'],   correct:1 },
+              { options:['beautiful','happy'],   correct:0 },
+              { options:['red','green'],          correct:1 },
+              { options:['happy','cool'],         correct:0 },
+              { options:['too','two'],             correct:0 },
+            ],
+          }],
+        },
+
+        /* 笔试一、字母填空(5 空) */
+        { id:7, type:'letter-fill',
+          title:'一、按字母表顺序写出小朋友面前字母的大小写', titleEn:'Alphabet fill',
+          hint:'看前后字母 → 选中间缺失的那个', pointsPerItem:1,
+          items:[{
+            id:'S1_7_01',
+            blanks:[
+              { before:'Aa', after:'Cc', options:['Bb','Dd','Ee'], correct:0 },
+              { before:'Dd', after:'Ff', options:['Cc','Ee','Gg'], correct:1 },
+              { before:'Mm', after:'Oo', options:['Pp','Nn','Ll'], correct:1 },
+              { before:'Pp', after:'Rr', options:['Qq','Ss','Oo'], correct:0 },
+              { before:'Vv', after:'Xx', options:['Uu','Yy','Ww'], correct:2 },
+            ],
+          }],
+        },
+
+        /* 笔试二、不同类(5 题 3 选) */
+        { id:8, type:'odd-one-out',
+          title:'二、选出每组单词中与其他不属于同一类的一项', titleEn:'Find the odd one out',
+          hint:'三个词,选最不像的那个', pointsPerItem:1,
+          items:[
+            { id:'S1_8_01', items:['like','play','carrot'],   correct:2, note:'like/play 动词,carrot 名词' },
+            { id:'S1_8_02', items:['apple','red','blue'],     correct:0, note:'red/blue 颜色,apple 水果' },
+            { id:'S1_8_03', items:['tree','book','flower'],   correct:1, note:'tree/flower 自然物,book 用品' },
+            { id:'S1_8_04', items:['onion','pea','cake'],     correct:2, note:'onion/pea 蔬菜,cake 甜食' },
+            { id:'S1_8_05', items:['please','carrot','sorry'],correct:1, note:'please/sorry 礼貌,carrot 蔬菜' },
+          ]},
+
+        /* 笔试三、图+2 句选 1(5 题) */
+        { id:9, type:'pic-sentence-choose',
+          title:'三、根据图片内容,选择合适的句子', titleEn:'Pick the matching sentence',
+          hint:'看图 → 选出描述正确的英文句子', pointsPerItem:1,
+          items:[
+            { id:'S1_9_01', image:'quiz:u3u4_2carrots',       options:['Two carrots.','Three carrots.'], correct:0 },
+            { id:'S1_9_02', image:'vocab:u4_flower', options:['I like flowers.','I like birds.'], correct:0 },
+            { id:'S1_9_03', image:'vocab:u4_kite',   options:['Look at the bag.','Look at the kite.'], correct:1 },
+            { id:'S1_9_04', image:'vocab:u3_pea',    options:['It is a pepper.','It is a pea.'], correct:1 },
+            { id:'S1_9_05', image:'emoji:🌸🌸🌸🌸🌸', options:['Five flowers.','Three flowers.'], correct:0 },
+          ]},
+
+        /* 笔试四、情景(5 题 2 选) */
+        { id:10, type:'scenario',
+          title:'四、根据所给情境,选择合适的英文表达', titleEn:'Pick the right response',
+          hint:'看中文场景 → 选合适的英文', pointsPerItem:1,
+          items:[
+            { id:'S1_10_01', scene:'你想吃一颗豌豆,可以说:',
+              options:['A pea?','A pea, please.'],                correct:1 },
+            { id:'S1_10_02', scene:'问妈妈买了几朵花:',
+              options:['How many flowers?','Flowers?'],           correct:0 },
+            { id:'S1_10_03', scene:'别人给你洋葱,你不想吃:',
+              options:['No, thanks.','No, please.'],              correct:0 },
+            { id:'S1_10_04', scene:'看到彩色的风筝,赞美说:',
+              options:['They are colourful.','They are happy.'],  correct:0 },
+            { id:'S1_10_05', scene:'朋友给你一颗糖,你可以说:',
+              options:['Sorry.','Thank you.'],                    correct:1 },
+          ]},
+
+        /* 笔试五、图+对话 T/F(5 题) */
+        { id:11, type:'pic-judge',
+          title:'五、判断下列图片是(☺)否(☹)与对话内容相符', titleEn:'Picture vs dialog',
+          hint:'看图 + 读对话 → 相符 ✓ 不符 ✗', pointsPerItem:2,
+          items:[
+            { id:'S1_11_01', image:'vocab:u3_carrot',
+              text:"— I like carrots.  — Me too.",               correct:true },
+            { id:'S1_11_02', image:'vocab:u4_bird',
+              text:"— A kite?  — No, it's a bird.",              correct:true },
+            { id:'S1_11_03', image:'vocab:u3_onion',
+              text:"— Peppers?  — Yes, please.",                  correct:false },
+            { id:'S1_11_04', image:'vocab:u4_flower',
+              text:"— Look at the flowers!  — They are nice.",   correct:true },
+            { id:'S1_11_05', image:'vocab:u3_pea',
+              text:"— How many kites?  — Five.",                  correct:false },
+          ]},
+
+        /* 笔试六、对话 A-E 填(5 空) */
+        { id:12, type:'dialog-line-fill',
+          title:'六、从方框中选择合适的句子,完成下面的对话(填序号)', titleEn:'Dialog line fill',
+          hint:'看方框 A-E 句子 → 填到对话合适位置', pointsPerItem:2,
+          items:[{
+            id:'S1_12_01',
+            pool:[
+              { id:'A', text:'Here you are.' },
+              { id:'B', text:'Yes, I do.' },
+              { id:'C', text:'Good morning, Su Hai.' },
+              { id:'D', text:'Carrots are yummy.' },
+              { id:'E', text:'Peppers are sweet, too.' },
+            ],
+            dialog:[
+              { speaker:'Su Hai', text:'Good morning, Liu Tao.' },
+              { speaker:'Liu Tao', blank:true, blankIdx:0 },
+              { speaker:'Su Hai', text:'I like peas. Do you like peas?' },
+              { speaker:'Liu Tao', blank:true, blankIdx:1 },
+              { speaker:'Su Hai', text:'Peas are sweet. And peppers?' },
+              { speaker:'Liu Tao', blank:true, blankIdx:2 },
+              { speaker:'Su Hai', text:'A pear?' },
+              { speaker:'Liu Tao', text:'No, thanks. Carrots, please.' },
+              { speaker:'Su Hai', blank:true, blankIdx:3 },
+              { speaker:'Liu Tao', text:'Thank you.' },
+              { speaker:'Su Hai', blank:true, blankIdx:4 },
+            ],
+            answers:{ 0:'C', 1:'B', 2:'E', 3:'A', 4:'D' },
+          }],
+        },
+
+      ],
+    },
+
+    /* ─────────────── 仿真卷 2 · 基于真卷风格 · 综合偏强 ─────────────── */
+    {
+      id: 'u3_paperSim2',
+      title: '仿真卷 2 · U3-U4',
+      subtitle: '贴合真卷 · 综合应用',
+      totalPoints: 100,
+      sections: [
+        /* 一、听录音选图(5 题) · [C,A,B,0,1] */
+        { id:1, type:'listen-pic-choose',
+          title:'一、听录音,选出与所听内容相符的图片(听两遍)', titleEn:'Listen and choose',
+          hint:'听录音 → 点对应的图', pointsPerItem:2,
+          items:[
+            { id:'S2_1_01', audioText:'I like cherries.',
+              options:[{ image:'quiz:u3u4_bananas', label:'bananas' },{ emoji:'🍎', label:'apples' },{ image:'quiz:u3u4_cherries', label:'cherries' }], correct:2 },
+            { id:'S2_1_02', audioText:'The flower is yellow.',
+              options:[{ image:'vocab:u4_flower', label:'flower' },{ image:'vocab:u4_tree', label:'tree' },{ image:'vocab:u4_bird', label:'bird' }], correct:0 },
+            { id:'S2_1_03', audioText:'How many onions? Four.',
+              options:[{ image:'quiz:u3u4_2onions', label:'2 onions' },{ emoji:'🧅🧅🧅🧅', label:'4 onions' },{ emoji:'🧅🧅🧅', label:'3 onions' }], correct:1 },
+            { id:'S2_1_04', audioText:'A carrot, please.',
+              options:[{ image:'vocab:u3_carrot', label:'carrot' },{ image:'vocab:u3_pea', label:'pea' },{ image:'vocab:u3_pepper', label:'pepper' }], correct:0 },
+            { id:'S2_1_05', audioText:'Look! A green tree.',
+              options:[{ image:'vocab:u4_kite', label:'kite' },{ image:'vocab:u4_tree', label:'tree' },{ image:'vocab:u4_flower', label:'flower' }], correct:1 },
+          ]},
+
+        /* 二、听录音排序(5 图) */
+        { id:2, type:'listen-order',
+          title:'二、听录音,根据所听内容用数字给下列图片排序(听两遍)', titleEn:'Listen and order',
+          hint:'听 5 段 → 标图顺序 1-5', pointsPerItem:2,
+          items:[{
+            id:'S2_2_01',
+            sequence:[
+              { audioText:'A bird? Yes. It is cute.' },
+              { audioText:'Cherries? No, thanks.' },
+              { audioText:'Look at the kite. It is colourful.' },
+              { audioText:'I like peppers. Me too.' },
+              { audioText:'Flowers are beautiful.' },
+            ],
+            images:[
+              { image:'vocab:u3_pepper', correctOrder:4 },
+              { image:'vocab:u4_bird',   correctOrder:1 },
+              { image:'vocab:u4_flower', correctOrder:5 },
+              { image:'quiz:u3u4_cherries',         correctOrder:2 },
+              { image:'vocab:u4_kite',   correctOrder:3 },
+            ],
+          }],
+        },
+
+        /* 三、听录音判断 T/F(5 题 · 答案 × √ √ × √) */
+        { id:3, type:'listen-judge',
+          title:'三、听录音,判断下列图片是(√)否(×)与所听内容相符(听两遍)', titleEn:'Listen and judge',
+          hint:'听 → 看图 → 相符 ✓ 不符 ✗', pointsPerItem:2,
+          items:[
+            { id:'S2_3_01', audio:'', audioText:'Two peppers, please.',
+              image:'vocab:u3_pea',    correct:false },
+            { id:'S2_3_02', audio:'', audioText:'The kite is colourful.',
+              image:'vocab:u4_kite',   correct:true },
+            { id:'S2_3_03', audio:'', audioText:'I like onions.',
+              image:'vocab:u3_onion',  correct:true },
+            { id:'S2_3_04', audio:'', audioText:'Look at the bird.',
+              image:'vocab:u4_flower', correct:false },
+            { id:'S2_3_05', audio:'', audioText:'Three green trees.',
+              image:'vocab:u4_tree',   correct:true },
+          ]},
+
+        /* 四、人 → 物连线 */
+        { id:4, type:'listen-match-pic',
+          title:'四、听录音,将左右两边相关联的图片用线连起来(听两遍)', titleEn:'Listen and match',
+          hint:'点🔊听 → 点 A-E 对应物品', pointsPerItem:2,
+          items:[{
+            id:'S2_4_01',
+            persons:[
+              { id:1, name:'Mike',      face:'emoji:👦',     audioText:"Hello, I am Mike. I can draw trees.",      expectedTarget:'B' },
+              { id:2, name:'Helen',     face:'emoji:👧',     audioText:"Hi, I am Helen. I like carrots.",          expectedTarget:'D' },
+              { id:3, name:'Tim',       face:'emoji:🧒',     audioText:"Good morning. I am Tim. Look at the bird.",expectedTarget:'C' },
+              { id:4, name:'Amy',       face:'emoji:👩',     audioText:"I am Amy. I like peppers.",                expectedTarget:'A' },
+              { id:5, name:'Mr. Green', face:'emoji:🧑‍🏫',  audioText:"I am Mr. Green. I like colourful flowers.",expectedTarget:'E' },
+            ],
+            targets:[
+              { id:'A', image:'vocab:u3_pepper', label:'pepper' },
+              { id:'B', image:'vocab:u4_tree',   label:'tree' },
+              { id:'C', image:'vocab:u4_bird',   label:'bird' },
+              { id:'D', image:'vocab:u3_carrot', label:'carrot' },
+              { id:'E', image:'vocab:u4_flower', label:'flowers' },
+            ],
+          }],
+        },
+
+        /* 五、听问句选答句(5 题 2 选) */
+        { id:5, type:'listen-response',
+          title:'五、听录音,选择合适的答语(听两遍)', titleEn:'Listen and choose response',
+          hint:'听 → 选最合适的英文答句', pointsPerItem:2,
+          items:[
+            { id:'S2_5_01', audio:'', audioText:'I like peppers.',
+              options:['Me too.','Three flowers.'],          correct:0 },
+            { id:'S2_5_02', audio:'', audioText:'Look at the birds.',
+              options:['Yes.','They are happy.'],            correct:1 },
+            { id:'S2_5_03', audio:'', audioText:'Cherries?',
+              options:['Yes, please.','Green trees.'],       correct:0 },
+            { id:'S2_5_04', audio:'', audioText:'How many peppers?',
+              options:['Red peppers.','Four peppers.'],      correct:1 },
+            { id:'S2_5_05', audio:'', audioText:'Thank you.',
+              options:["You're welcome.",'Me too.'],         correct:0 },
+          ]},
+
+        /* 六、听对话每空 A/B 选 */
+        { id:6, type:'listen-fill-choose',
+          title:'六、听录音,选择合适的单词完成对话(听两遍)', titleEn:'Listen and fill',
+          hint:'先听整段 → 每空 A/B', pointsPerItem:2,
+          items:[{
+            id:'S2_6_01', audio:'',
+            audioText:"M: Look at the trees. W: They are green. M: A bird? W: Yes. It is cute. M: Look at the flowers. W: They are beautiful. M: And the kite? W: The kite is colourful. M: Me too, I like colourful kites.",
+            dialog:[
+              { speaker:'M', parts:[{t:'Look at the trees.'}] },
+              { speaker:'W', parts:[{t:'They are '},{blank:0},{t:'.'}] },
+              { speaker:'M', parts:[{t:'A '},{blank:1},{t:'?'}] },
+              { speaker:'W', parts:[{t:'Yes. It is cute.'}] },
+              { speaker:'M', parts:[{t:'Look at the '},{blank:2},{t:'.'}] },
+              { speaker:'W', parts:[{t:'They are beautiful.'}] },
+              { speaker:'M', parts:[{t:'And the kite?'}] },
+              { speaker:'W', parts:[{t:'The kite is '},{blank:3},{t:'.'}] },
+              { speaker:'M', parts:[{t:'Me too, I like '},{blank:4},{t:' kites.'}] },
+            ],
+            blanks:[
+              { options:['red','green'],            correct:1 },
+              { options:['bird','pea'],             correct:0 },
+              { options:['flowers','carrots'],      correct:0 },
+              { options:['colourful','happy'],      correct:0 },
+              { options:['colourful','big'],        correct:0 },
+            ],
+          }],
+        },
+
+        /* 笔试一、字母填空(5 空) · 换另一组 */
+        { id:7, type:'letter-fill',
+          title:'一、按字母表顺序写出字母的大小写', titleEn:'Alphabet fill',
+          hint:'看前后字母 → 选中间的', pointsPerItem:1,
+          items:[{
+            id:'S2_7_01',
+            blanks:[
+              { before:'Bb', after:'Dd', options:['Aa','Cc','Ee'], correct:1 },
+              { before:'Ff', after:'Hh', options:['Gg','Ee','Ii'], correct:0 },
+              { before:'Kk', after:'Mm', options:['Nn','Ll','Jj'], correct:1 },
+              { before:'Rr', after:'Tt', options:['Uu','Qq','Ss'], correct:2 },
+              { before:'Ww', after:'Yy', options:['Vv','Zz','Xx'], correct:2 },
+            ],
+          }],
+        },
+
+        /* 笔试二、不同类 */
+        { id:8, type:'odd-one-out',
+          title:'二、选出每组单词中与其他不属于同一类的一项', titleEn:'Find the odd one out',
+          hint:'三个词,选最不像的那个', pointsPerItem:1,
+          items:[
+            { id:'S2_8_01', items:['carrot','pepper','apple'],  correct:2, note:'carrot/pepper 蔬菜,apple 水果' },
+            { id:'S2_8_02', items:['run','jump','tree'],        correct:2, note:'run/jump 动作,tree 名词' },
+            { id:'S2_8_03', items:['pink','yellow','kite'],     correct:2, note:'pink/yellow 颜色,kite 物品' },
+            { id:'S2_8_04', items:['please','sorry','onion'],   correct:2, note:'please/sorry 礼貌词,onion 蔬菜' },
+            { id:'S2_8_05', items:['bird','flower','tree'],     correct:0, note:'flower/tree 植物,bird 动物' },
+          ]},
+
+        /* 笔试三、图+2 句选 1 */
+        { id:9, type:'pic-sentence-choose',
+          title:'三、根据图片内容,选择合适的句子', titleEn:'Pick the matching sentence',
+          hint:'看图 → 选正确英文', pointsPerItem:1,
+          items:[
+            { id:'S2_9_01', image:'emoji:🧅🧅🧅🧅',  options:['Three onions.','Four onions.'], correct:1 },
+            { id:'S2_9_02', image:'vocab:u4_bird',    options:['Look! The birds are happy.','Look! The trees are green.'], correct:0 },
+            { id:'S2_9_03', image:'quiz:u3u4_monkey_carrot',       options:['I like bananas.','I like carrots.'], correct:1 },
+            { id:'S2_9_04', image:'vocab:u3_pea',     options:['The peas are green.','The peas are red.'], correct:0 },
+            { id:'S2_9_05', image:'vocab:u4_kite',    options:['This is my bag.','This is my kite.'], correct:1 },
+          ]},
+
+        /* 笔试四、情景 */
+        { id:10, type:'scenario',
+          title:'四、根据所给情境,选择合适的英文表达', titleEn:'Pick the right response',
+          hint:'看中文场景 → 选英文', pointsPerItem:1,
+          items:[
+            { id:'S2_10_01', scene:'你想吃几个甜椒,礼貌地问:',
+              options:['Peppers?','Peppers, please.'],         correct:1 },
+            { id:'S2_10_02', scene:'看到朋友的新书包:',
+              options:['Look at my book.','Look at your bag.'],correct:1 },
+            { id:'S2_10_03', scene:'朋友说喜欢豌豆,你也喜欢:',
+              options:['Me too.','Thank you.'],                correct:0 },
+            { id:'S2_10_04', scene:'描述树是绿色的:',
+              options:['The tree is green.','The tree is red.'], correct:0 },
+            { id:'S2_10_05', scene:'问对方有几只鸟:',
+              options:['Are you happy?','How many birds?'],    correct:1 },
+          ]},
+
+        /* 笔试五、图+对话 T/F */
+        { id:11, type:'pic-judge',
+          title:'五、判断下列图片是(☺)否(☹)与对话内容相符', titleEn:'Picture vs dialog',
+          hint:'看图 + 读对话 → 相符 ✓ 不符 ✗', pointsPerItem:2,
+          items:[
+            { id:'S2_11_01', image:'vocab:u3_pepper',
+              text:"— A pepper?  — Yes, please.",             correct:true },
+            { id:'S2_11_02', image:'vocab:u4_tree',
+              text:"— The kites are colourful.  — Yes!",      correct:false },
+            { id:'S2_11_03', image:'vocab:u3_onion',
+              text:"— How many onions?  — Three.",             correct:true },
+            { id:'S2_11_04', image:'vocab:u3_carrot',
+              text:"— I like carrots.  — Me too.",            correct:true },
+            { id:'S2_11_05', image:'vocab:u4_flower',
+              text:"— A pea?  — Yes, please.",                 correct:false },
+          ]},
+
+        /* 笔试六、对话 A-E 填 */
+        { id:12, type:'dialog-line-fill',
+          title:'六、从方框中选择合适的句子,完成下面的对话(填序号)', titleEn:'Dialog line fill',
+          hint:'看方框 A-E → 填对话', pointsPerItem:2,
+          items:[{
+            id:'S2_12_01',
+            pool:[
+              { id:'A', text:"They are colourful." },
+              { id:'B', text:"Me too." },
+              { id:'C', text:"Hi, Yang Ling!" },
+              { id:'D', text:"Three kites." },
+              { id:'E', text:"Yes, I do." },
+            ],
+            dialog:[
+              { speaker:'Yang Ling', text:"Hi, Wang Bing!" },
+              { speaker:'Wang Bing', blank:true, blankIdx:0 },
+              { speaker:'Yang Ling', text:"Look at the kites!" },
+              { speaker:'Wang Bing', blank:true, blankIdx:1 },
+              { speaker:'Yang Ling', text:"How many kites?" },
+              { speaker:'Wang Bing', blank:true, blankIdx:2 },
+              { speaker:'Yang Ling', text:"I like colourful kites. Do you like kites?" },
+              { speaker:'Wang Bing', blank:true, blankIdx:3 },
+              { speaker:'Yang Ling', text:"I like kites, too." },
+              { speaker:'Wang Bing', blank:true, blankIdx:4 },
+            ],
+            answers:{ 0:'C', 1:'A', 2:'D', 3:'E', 4:'B' },
+          }],
+        },
+
+      ],
+    },
+
+
+    /* ─────────────── 真卷 · U3-U4 月考 (时代英语报) ───────────────
+     * 来源: 时代英语报一年级下册自我评价 2
+     * 听力原文 + 参考答案来自原出版物(权威 · 答案唯一)
+     * 注: 听力 audio 走 TTS(原卷录音未数字化) · audioText 即听力原文
+     * 本次仅 digitize 听力第一大题作 demo · 其余 section 后续扩展
+     * ────────────────────────────────────────────────────────── */
+    {
+      id: 'u3_paperReal1',
+      title: '真卷 · U3-U4 月考',
+      subtitle: '时代英语报 · 权威真卷(持续扩展中)',
+      source: '时代英语报一年级下册自我评价2',
+      totalPoints: 10,
+      sections: [
+        { id:1, type:'listen-pic-choose',
+          title:'一、听录音,选出与所听内容相符的图片(听两遍)',
+          titleEn:'Listen and choose the picture',
+          hint:'听录音 → 点对应的图(每题 2 分)',
+          pointsPerItem:2,
+          items:[
+            { id:'R1_01', audioText:'I like onions.',
+              options:[
+                { image:'vocab:u3_onion',  label:'onions' },
+                { image:'quiz:u3u4_bananas',               label:'bananas' },
+                { image:'quiz:u3u4_grapes',               label:'grapes' },
+              ], correct:0 },
+            { id:'R1_02', audioText:'The flowers are beautiful.',
+              options:[
+                { image:'vocab:u4_tree',   label:'trees' },
+                { image:'vocab:u4_flower', label:'flowers' },
+                { image:'vocab:u4_kite',   label:'kites' },
+              ], correct:1 },
+            { id:'R1_03', audioText:'Look at the pepper. It can sing.',
+              options:[
+                { image:'vocab:u3_carrot', label:'carrot' },
+                { image:'vocab:u3_pea',    label:'pea' },
+                { image:'vocab:u3_pepper', label:'pepper' },
+              ], correct:2 },
+            { id:'R1_04', audioText:'How many birds? Three birds.',
+              options:[
+                { image:'quiz:u3u4_1bird',       label:'one bird' },
+                { image:'quiz:u3u4_2birds',     label:'two birds' },
+                { emoji:'🐦🐦🐦',   label:'three birds' },
+              ], correct:2 },
+            { id:'R1_05', audioText:'Two carrots, please.',
+              options:[
+                { image:'quiz:u3u4_2carrots',             label:'two carrots' },
+                { image:'vocab:u3_pepper', label:'peppers' },
+                { emoji:'🍒🍒',             label:'cherries' },
+              ], correct:0 },
+          ]},
+
+        /* —— 二、听录音排序(5 图)· 答案 4-3-5-1-2 —— */
+        { id:2, type:'listen-order',
+          title:'二、听录音,根据所听内容用数字给下列图片排序(听两遍)',
+          titleEn:'Listen and order',
+          hint:'听 5 段对话 → 点图下数字 1-5 标顺序',
+          pointsPerItem:2,
+          items:[{
+            id:'R2_01',
+            sequence:[
+              { audioText:'Look at the kites! They are colourful.' },
+              { audioText:'I like puppies. Me too.' },
+              { audioText:'Onions? Yes, please. I like onions.' },
+              { audioText:'Is this your peas? Yes. Thank you.' },
+              { audioText:'Grapes? No, thanks.' },
+            ],
+            images:[
+              { image:'vocab:u3_pea',   correctOrder:4 },  // 图 1 · 对应对话 4 (peas)
+              { image:'vocab:u3_onion', correctOrder:3 },  // 图 2 · 对应对话 3 (onions)
+              { image:'quiz:u3u4_grapes',        correctOrder:5 },  // 图 3 · 对应对话 5 (grapes 拒绝)
+              { image:'vocab:u4_kite',  correctOrder:1 },  // 图 4 · 对应对话 1 (kites)
+              { image:'quiz:u3u4_puppy',        correctOrder:2 },  // 图 5 · 对应对话 2 (puppies)
+            ],
+          }],
+        },
+
+        /* —— 三、听录音判断图片 T/F(5 题)· 答案 × √ × √ √ —— */
+        { id:3, type:'listen-judge',
+          title:'三、听录音,判断下列图片是(√)否(×)与所听内容相符(听两遍)',
+          titleEn:'Listen and judge',
+          hint:'听 → 看图 → 相符 ✓ 不符 ✗',
+          pointsPerItem:2,
+          items:[
+            { id:'R3_01', audio:'',
+              audioText:'I like peas. Me too.',
+              image:'vocab:u4_flower',    correct:false },   // 图花,听豌豆
+            { id:'R3_02', audio:'',
+              audioText:'Cherries? Yes, please. I like cherries.',
+              image:'quiz:u3u4_cherries',           correct:true },
+            { id:'R3_03', audio:'',
+              audioText:'A robot? No, thanks.',
+              image:'quiz:u3u4_robot',           correct:false },   // 图机器人 + 对话拒绝 = 不符(按真卷答案)
+            { id:'R3_04', audio:'',
+              audioText:'Look at the flowers. They are happy.',
+              image:'vocab:u4_flower',    correct:true },
+            { id:'R3_05', audio:'',
+              audioText:"Is this a bird? No. It's a kite.",
+              image:'vocab:u4_kite',      correct:true },    // 图风筝,对话确认风筝
+          ],
+        },
+
+        /* —— 五、听录音选答句(5 题 A/B)· 答案 A B A A B —— */
+        { id:5, type:'listen-response',
+          title:'五、听录音,根据所听内容选择合适的答语(听两遍)',
+          titleEn:'Listen and choose response',
+          hint:'听 → 选最合适的英文答句',
+          pointsPerItem:2,
+          items:[
+            { id:'R5_01', audio:'', audioText:'I like onions.',
+              options:['Me too.',            'Three onions.'],        correct:0 },
+            { id:'R5_02', audio:'', audioText:'Look at my coat.',
+              options:['They are great.',    'It is beautiful.'],     correct:1 },
+            { id:'R5_03', audio:'', audioText:'Peppers?',
+              options:['Yes, please.',       'Three grapes.'],        correct:0 },
+            { id:'R5_04', audio:'', audioText:'Is this your kite?',
+              options:['Yes.',               'Great!'],               correct:0 },
+            { id:'R5_05', audio:'', audioText:'How many trees?',
+              options:['Green trees.',       'Four trees.'],          correct:1 },
+          ],
+        },
+
+        /* —— 笔试二、选不同类(5 题 3 选 1)· 答案 C B C A B —— */
+        { id:8, type:'odd-one-out',
+          title:'选出下列每组单词中与其他不属于同一类的一项',
+          titleEn:'Find the odd one out',
+          hint:'A B C 三个词,选最不像的那个',
+          pointsPerItem:1,
+          items:[
+            { id:'W2_01', items:['like','look','please'],     correct:2, note:'like/look 动作,please 礼貌词' },
+            { id:'W2_02', items:['pea','banana','pepper'],    correct:1, note:'pea/pepper 蔬菜,banana 水果' },
+            { id:'W2_03', items:['red','green','spring'],     correct:2, note:'red/green 颜色,spring 季节' },
+            { id:'W2_04', items:['ruler','tree','flower'],    correct:0, note:'tree/flower 自然物,ruler 学习用品' },
+            { id:'W2_05', items:['nice','kite','happy'],      correct:1, note:'nice/happy 形容词,kite 名词' },
+          ],
+        },
+
+        /* —— 笔试四、情景选择(5 题 A/B)· 答案 B A A B A —— */
+        { id:10, type:'scenario',
+          title:'根据所给情境,选择合适的英文表达',
+          titleEn:'Pick the right response',
+          hint:'看中文场景 → 选合适的英文',
+          pointsPerItem:1,
+          items:[
+            { id:'W4_01', scene:'你想吃一根胡萝卜,可以和妈妈说:',
+              options:['A carrot?',          'A carrot, please.'],            correct:1 },
+            { id:'W4_02', scene:'你想问爸爸买几个甜椒,可以说:',
+              options:['How many peppers?',  'Peppers?'],                     correct:0 },
+            { id:'W4_03', scene:'爸爸问你是否要出去放风筝,你可以回答:',
+              options:['Yes. I like it.',    "No. I like it."],               correct:0 },
+            { id:'W4_04', scene:'妈妈买了一束花,你可以说:',
+              options:['They are happy.',    'They are beautiful.'],          correct:1 },
+            { id:'W4_05', scene:'你向同学展示你的弹珠,可以说:',
+              options:['Look at my marble.', 'Look! Is this my marble?'],     correct:0 },
+          ],
+        },
+
+        /* —— 笔试五、判断图片与对话是否相符(5 题 ☺/☹)· 答案 ☺ ☹ ☺ ☹ ☺ —— */
+        { id:11, type:'pic-judge',
+          title:'判断下列图片是(☺)否(☹)与对话内容相符',
+          titleEn:'Picture vs dialog',
+          hint:'看图 + 读对话 → 相符 ✓ 不符 ✗',
+          pointsPerItem:2,
+          items:[
+            { id:'W5_01', image:'vocab:u3_pea',
+              text:"— Peas, Liu Tao?  — Yes. I like them.",   correct:true },
+            { id:'W5_02', image:'vocab:u4_bird',
+              text:"— I like birds.  — Me too.",              correct:false },   // 图是气球,不是鸟(按真卷答案 ☹)
+            { id:'W5_03', image:'vocab:u4_tree',
+              text:"— Look at the trees!  — They are happy.", correct:true },
+            { id:'W5_04', image:'vocab:u4_kite',
+              text:"— Is this your kite?  — No.",             correct:false },   // 图男孩手里不是风筝(按真卷答案 ☹)
+            { id:'W5_05', image:'vocab:u3_pepper',
+              text:"— How many peppers?  — Four.",            correct:true },
+          ],
+        },
+
+        /* —— 四、听录音连线(5 人 → 5 物)· 答案 1-D 2-E 3-C 4-B 5-A —— */
+        { id:4, type:'listen-match-pic',
+          title:'四、听录音,将左右两边相关联的图片用线连起来(听两遍)',
+          titleEn:'Listen and match',
+          hint:'点🔊听每个人说话 → 再点 A-E 对应的物品',
+          pointsPerItem:2,
+          items:[{
+            id:'R4_01',
+            persons:[
+              { id:1, name:'Su Hai',    face:'emoji:👧',
+                audioText:'Hello, I am Su Hai. I like carrots.',   expectedTarget:'D' },
+              { id:2, name:'Wang Bing', face:'emoji:🧑',
+                audioText:'Good morning. I am Wang Bing. I can draw birds.', expectedTarget:'E' },
+              { id:3, name:'Yang Ling', face:'emoji:👱‍♀️',
+                audioText:'Hello, I am Yang Ling. Look at the green tree.',   expectedTarget:'C' },
+              { id:4, name:'Liu Tao',   face:'emoji:👦',
+                audioText:'Good afternoon. I am Liu Tao. This is my teddy.',  expectedTarget:'B' },
+              { id:5, name:'Miss Li',   face:'emoji:👩‍🏫',
+                audioText:'I am Miss Li. I like colourful flowers.',          expectedTarget:'A' },
+            ],
+            targets:[
+              { id:'A', image:'vocab:u4_flower', label:'flowers' },
+              { id:'B', image:'quiz:u3u4_teddy',         label:'teddy' },
+              { id:'C', image:'vocab:u4_tree',    label:'tree' },
+              { id:'D', image:'vocab:u3_carrot',  label:'carrots' },
+              { id:'E', image:'vocab:u4_bird',    label:'birds' },
+            ],
+          }],
+        },
+
+        /* —— 六、听对话每空 A/B 选(5 空)· 答案 A B B B A —— */
+        { id:6, type:'listen-fill-choose',
+          title:'六、听录音,选择合适的单词完成下面的对话(听两遍)',
+          titleEn:'Listen and fill',
+          hint:'先听完整段 → 再每个空 A/B 选',
+          pointsPerItem:2,
+          items:[{
+            id:'R6_01',
+            audio:'',
+            audioText:"M: Look at the kites. W: They are colourful. M: A blue kite? W: No. M: A green kite? W: Yes. I like green kites. M: Me too. Look at this green kite! W: Oh! It's beautiful.",
+            dialog:[
+              { speaker:'M', parts:[{t:'Look at the kites.'}] },
+              { speaker:'W', parts:[{t:'They are '},{blank:0},{t:'.'}] },
+              { speaker:'M', parts:[{t:'A '},{blank:1},{t:' kite?'}] },
+              { speaker:'W', parts:[{t:'No.'}] },
+              { speaker:'M', parts:[{t:'A '},{blank:2},{t:' kite?'}] },
+              { speaker:'W', parts:[{t:'Yes. I '},{blank:3},{t:' green kites.'}] },
+              { speaker:'M', parts:[{t:'Me too. Look at this green kite!'}] },
+              { speaker:'W', parts:[{t:"Oh! It's "},{blank:4},{t:'.'}] },
+            ],
+            blanks:[
+              { options:['colourful','happy'],      correct:0 },
+              { options:['pink','blue'],             correct:1 },
+              { options:['red','green'],             correct:1 },
+              { options:['count','like'],            correct:1 },
+              { options:['beautiful','great'],       correct:0 },
+            ],
+          }],
+        },
+
+        /* —— 笔试一、按字母表填缺字母(5 空)· 答案 Hh Jj Kk Mm Nn —— */
+        { id:7, type:'letter-fill',
+          title:'一、按字母表顺序写出小朋友面前字母的大小写',
+          titleEn:'Alphabet fill',
+          hint:'看前后字母 → 选中间缺失的那个',
+          pointsPerItem:1,
+          items:[{
+            id:'W1_01',
+            blanks:[
+              { before:'Gg', after:'Ii', options:['Hh','Kk','Jj'],  correct:0 },
+              { before:'Ii', after:'Kk', options:['Ll','Jj','Ii'],  correct:1 },
+              { before:'Jj', after:'Ll', options:['Ii','Kk','Mm'],  correct:1 },
+              { before:'Ll', after:'Nn', options:['Mm','Ll','Oo'],  correct:0 },
+              { before:'Mm', after:'Oo', options:['Kk','Pp','Nn'],  correct:2 },
+            ],
+          }],
+        },
+
+        /* —— 笔试三、看图选句子(5 题 A/B)· 答案 B A A B A —— */
+        { id:9, type:'pic-sentence-choose',
+          title:'三、根据图片内容,选择合适的句子',
+          titleEn:'Pick the matching sentence',
+          hint:'看图 → 选出描述正确的英文句子',
+          pointsPerItem:1,
+          items:[
+            { id:'W3_01', image:'emoji:🧅🧅🧅',
+              options:['Two onions.','Three onions.'], correct:1 },
+            { id:'W3_02', image:'vocab:u4_kite',
+              options:['Look! The kites are beautiful.','Look! The birds are beautiful.'], correct:0 },
+            { id:'W3_03', image:'quiz:u3u4_monkey_carrot',
+              options:['I like carrots.','I like bananas.'], correct:0 },
+            { id:'W3_04', image:'quiz:u3u4_bag',
+              options:['This is my book.','This is my bag.'], correct:1 },
+            { id:'W3_05', image:'vocab:u3_pea',
+              options:['The peas are green.','The trees are red.'], correct:0 },
+          ],
+        },
+
+        /* —— 笔试六、对话整句填空(5 空 A-E)· 答案 C B E A D —— */
+        { id:12, type:'dialog-line-fill',
+          title:'六、从方框中选择合适的句子,完成下面的对话(填序号)',
+          titleEn:'Dialog line fill',
+          hint:'看方框 A-E 句子 → 填到对话合适位置',
+          pointsPerItem:2,
+          items:[{
+            id:'W6_01',
+            pool:[
+              { id:'A', text:'They are beautiful.' },
+              { id:'B', text:'Thank you!' },
+              { id:'C', text:'Good morning, Yang Ling.' },
+              { id:'D', text:'I like spring.' },
+              { id:'E', text:'Look, Wang Bing!' },
+            ],
+            dialog:[
+              { speaker:'Yang Ling', text:'Good morning, Wang Bing.' },
+              { speaker:'Wang Bing', blank:true, blankIdx:0 },
+              { speaker:'Yang Ling', text:'Your kite is great, Wang Bing.' },
+              { speaker:'Wang Bing', blank:true, blankIdx:1, suffix:"Your kite is great too. It's colourful." },
+              { speaker:'Yang Ling', text:"I like colourful kites.", blank:true, blankIdx:2, suffix:"The flowers are nice." },
+              { speaker:'Wang Bing', text:'Yes.', blank:true, blankIdx:3, suffix:"And the trees are green now." },
+              { speaker:'Yang Ling', text:'Look! The birds are happy.' },
+              { speaker:'Wang Bing', blank:true, blankIdx:4, suffix:"It's colourful." },
+              { speaker:'Yang Ling', text:'Me too.' },
+            ],
+            answers:{ 0:'C', 1:'B', 2:'E', 3:'A', 4:'D' },
+          }],
+        },
+
+      ],
+    },
+
+  ],
+
+};
+
+// 按 paperId 生成固定考卷(不随机抽题)
+function generatePaperById(unit, paperId) {
+  const papers = QUIZ_PAPERS[unit];
+  if (!papers) return null;
+  const paper = papers.find(p => p.id === paperId);
+  if (!paper) return null;
+  return {
+    unit,
+    title: paper.title,
+    subtitle: paper.subtitle,
+    totalPoints: paper.totalPoints || 100,
+    startedAt: Date.now(),
+    paperId,
+    sections: paper.sections.slice().sort((a, b) => a.id - b.id).map(sec => ({
+      id: sec.id,
+      type: sec.type,
+      title: sec.title,
+      titleEn: sec.titleEn,
+      hint: sec.hint,
+      pointsPerItem: sec.pointsPerItem,
+      // items 固定,不随机抽
+      items: sec.items.slice(),
+      userAnswers: {},
+      graded: false,
+    })),
+  };
+}
+
 // 生成一套考卷（按 sections 配置抽题 · 按 id 排序）
 function generateQuizPaper(unit) {
   const u = QUIZ_BANKS[unit];
@@ -1538,7 +2371,9 @@ function generateQuizPaper(unit) {
 /* ==================== 暴露 ==================== */
 if (typeof window !== 'undefined') {
   window.QUIZ_BANKS        = QUIZ_BANKS;
+  window.QUIZ_PAPERS       = QUIZ_PAPERS;
   window.resolveQuizAsset  = resolveQuizAsset;
   window.sampleQuizItems   = sampleQuizItems;
   window.generateQuizPaper = generateQuizPaper;
+  window.generatePaperById = generatePaperById;
 }

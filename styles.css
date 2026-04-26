@@ -141,7 +141,8 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--s-md) var(--s-lg);
+  /* 纵向 padding 压到 6px,给下方主干题目腾空间 */
+  padding: 6px var(--s-lg);
   background: var(--white);
   border-bottom: var(--border-ink);
   flex-shrink: 0;
@@ -152,10 +153,10 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
   align-items: center;
   gap: var(--s-sm);
   font-family: var(--font-zh-title);
-  font-size: 1.5rem;
+  font-size: 1.25rem;
 }
 .topbar .logo .logo-emoji {
-  font-size: 2.25rem;
+  font-size: 1.75rem;
   animation: wiggle 2.4s ease-in-out infinite;
 }
 .topbar .actions {
@@ -1557,21 +1558,22 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 12px 16px 20px;
+  /* 紧凑 padding · gap 压到 8 · 给主干腾空间 */
+  padding: 6px 16px 10px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   height: 100%;
   min-height: 0;
 }
 
-/* 顶部：大题号 + 标题 + 进度条 */
+/* 顶部：大题号 + 标题 + 进度条 · 单行 padding 6 + badge 28 = ~44px 整行 */
 .quiz-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
+  gap: 10px;
+  padding: 6px 14px;
   background: var(--white);
   border: var(--border-ink-thick);
   border-radius: var(--r-lg);
@@ -1580,13 +1582,14 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
 }
 .quiz-header .q-badge {
   flex-shrink: 0;
-  width: 36px; height: 36px;
+  width: 28px; height: 28px;
   border-radius: 50%;
   background: var(--pink);
-  border: 3px solid var(--ink);
+  border: 2px solid var(--ink);
   display: flex; align-items: center; justify-content: center;
   font-family: var(--font-en);
   font-weight: 700;
+  font-size: 0.85rem;
   color: var(--ink);
   box-shadow: 2px 2px 0 var(--ink);
 }
@@ -1594,16 +1597,21 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
   flex: 1;
   min-width: 0;
   font-family: var(--font-zh-title);
-  font-size: 1.15rem;
+  font-size: 1.0rem;
   color: var(--ink);
   line-height: 1.3;
+  /* 标题+提示 同一行,不再换行占第二行 */
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 .quiz-header .q-title .hint {
-  display: block;
+  display: inline;
   font-family: var(--font-zh-body);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: var(--ink-light);
-  margin-top: 2px;
+  margin-top: 0;
   font-weight: normal;
 }
 .quiz-header .q-progress {
@@ -2240,6 +2248,37 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
   border-top: 1px dashed #666;
   padding-top: 4px;
 }
+.pq-order-emoji {
+  font-size: 2.5rem;
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+/* —— 新题型打印样式 —— */
+/* listen-pic-choose · 听录音选 3 图 */
+.print-quiz .pq-pc-row {
+  display: flex; align-items: center; gap: 12px; margin: 8px 0;
+}
+.print-quiz .pq-pc-num { width: 70px; font-weight: 700; flex-shrink: 0; }
+.print-quiz .pq-pc-opts { display: flex; gap: 12px; flex: 1; }
+.print-quiz .pq-pc-cell {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  border: 1px solid #999; padding: 4px; min-width: 80px;
+}
+.print-quiz .pq-pc-letter { font-weight: 700; font-size: 0.85rem; }
+.print-quiz .pq-pc-img { width: 70px; height: 70px; object-fit: contain; }
+.print-quiz .pq-pc-emoji { font-size: 2rem; line-height: 1.2; }
+
+/* pic-sentence-choose · 图 + 2 句选 1 */
+.print-quiz .pq-ps-row {
+  display: flex; align-items: center; gap: 12px; margin: 8px 0;
+  border-bottom: 1px dashed #ccc; padding-bottom: 6px;
+}
+.print-quiz .pq-ps-num { width: 60px; font-weight: 700; flex-shrink: 0; }
+.print-quiz .pq-ps-img { width: 70px; height: 70px; object-fit: contain; flex-shrink: 0; }
+.print-quiz .pq-ps-emoji { font-size: 2rem; flex-shrink: 0; min-width: 70px; text-align: center; }
+.print-quiz .pq-ps-opts { flex: 1; }
+.print-quiz .pq-ps-opts > div { margin: 2px 0; }
 
 @media print {
   /* 打印时图片别太大 */
@@ -3433,11 +3472,304 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
 .letter-picker-btn.selected { background: var(--pink); color: var(--white); }
 
 /* 听录音排序 */
+/* ========== 答卷回看 (review) ========== */
+.quiz-review-shell {
+  max-width: 1100px;
+  height: 100%;
+  display: flex; flex-direction: column;
+  gap: 8px;
+}
+.quiz-review-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px;
+  background: var(--white);
+  border: 2px solid var(--ink);
+  border-radius: var(--r);
+  box-shadow: 2px 2px 0 var(--ink);
+  flex-shrink: 0;
+}
+.quiz-review-body {
+  flex: 1; min-height: 0; overflow-y: auto;
+  padding: 4px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.quiz-review-section {
+  background: var(--white);
+  border: 2px solid var(--ink);
+  border-radius: var(--r);
+  padding: 10px 14px;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+.quiz-review-section-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 8px; margin-bottom: 8px;
+  border-radius: var(--r-sm);
+  font-family: var(--font-zh-title);
+}
+.qrs-full { background: #c8f0c8; color: #1f5d1f; }   /* 全对绿 */
+.qrs-mid  { background: #fff4a0; color: #6a4a00; }   /* 中等黄 */
+.qrs-low  { background: #FFD6D6; color: #8a1f1f; }   /* 错多红 */
+.qrs-title { font-weight: 700; font-size: 0.95rem; flex: 1; }
+.qrs-score { font-family: var(--font-en); font-weight: 700; }
+.quiz-review-footer {
+  display: flex; gap: 12px; justify-content: center;
+  padding: 8px 0;
+  flex-shrink: 0;
+}
+/* 答案对照表 */
+.qrs-answer-table {
+  margin-top: 10px; border-top: 2px dashed var(--ink-light);
+  padding-top: 8px;
+  font-size: 0.9rem;
+}
+.qrs-answer-thead, .qrs-answer-row {
+  display: grid;
+  grid-template-columns: 50px 1fr 1fr 30px;
+  gap: 8px;
+  padding: 4px 6px;
+  align-items: center;
+  border-radius: var(--r-sm);
+}
+.qrs-answer-thead {
+  font-weight: 700; color: var(--ink-light);
+  border-bottom: 1px solid var(--ink-light);
+  margin-bottom: 4px;
+  font-size: 0.8rem;
+}
+.qrs-answer-row.qrs-ok { background: #e8f7e8; color: #1f5d1f; }
+.qrs-answer-row.qrs-no { background: #ffe7e7; color: #8a1f1f; }
+.qrs-q-cell { font-family: var(--font-en); font-weight: 700; }
+.qrs-user-cell, .qrs-correct-cell {
+  font-family: var(--font-en);
+  word-break: break-word;
+}
+.qrs-result-cell { font-weight: 700; text-align: center; font-size: 1.1rem; }
+.qrs-explain-cell {
+  grid-column: 1 / -1;
+  padding: 4px 8px;
+  background: #fff8d4;
+  border-left: 3px solid #f0b000;
+  border-radius: var(--r-sm);
+  margin-top: 4px;
+  font-family: var(--font-zh-body);
+  color: #6a4a00;
+}
+
+/* ========== 真卷新题型 CSS ========== */
+
+/* listen-match-pic · 人 → 图连线 (听力四) */
+.q-match-pic-grid { display: flex; flex-direction: column; gap: 8px; }
+.q-match-pic-row {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--white); border: 2px solid var(--ink); border-radius: var(--r);
+  padding: 8px 10px; box-shadow: 2px 2px 0 var(--ink);
+}
+.q-match-pic-person {
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0; width: 130px;
+}
+.q-match-pic-face { font-size: 2rem; }
+.q-match-pic-face-img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+.q-match-pic-name { font-family: var(--font-en); font-weight: 700; font-size: 0.85rem; }
+.q-match-pic-targets { display: flex; gap: 6px; flex: 1; flex-wrap: wrap; }
+.q-match-pic-target {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 4px; min-width: 70px; min-height: 70px;
+  background: var(--cream); border: 2px solid var(--ink); border-radius: var(--r-sm);
+  cursor: pointer; font-family: inherit;
+}
+.q-match-pic-target:hover { background: var(--white); }
+.q-match-pic-target.selected { background: var(--pink); color: var(--white); }
+.q-match-pic-target.correct-answer { background: #c8f0c8; border-color: #2a7a2a; }
+.q-match-pic-target.wrong { background: #FFD6D6; border-color: #c40; }
+.q-mp-letter { font-family: var(--font-en); font-weight: 700; font-size: 0.85rem; }
+.q-mp-emoji { font-size: 1.6rem; }
+.q-mp-timg { width: 40px; height: 40px; object-fit: contain; }
+
+/* listen-fill-choose · 听对话每空 A/B 选 (听力六) */
+.q-fill-choose-dialog {
+  background: var(--white); border: 2px solid var(--ink); border-radius: var(--r);
+  padding: 14px 18px; font-family: var(--font-en); line-height: 2.4;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+.q-fill-choose-line { margin-bottom: 6px; }
+.q-fc-speaker { color: var(--pink); }
+.q-fc-chip { display: inline-flex; align-items: center; gap: 4px; margin: 0 4px; }
+.q-fc-blank-no {
+  font-family: var(--font-en); color: var(--ink-light);
+  font-size: 0.75rem;
+}
+.q-fc-opt {
+  padding: 2px 10px; border: 2px solid var(--ink); border-radius: var(--r-sm);
+  background: var(--cream); cursor: pointer; font-family: inherit; font-size: 0.9rem;
+}
+.q-fc-opt:hover { background: var(--white); }
+.q-fc-opt.selected { background: var(--pink); color: var(--white); }
+.q-fc-opt.correct-answer { background: #c8f0c8; border-color: #2a7a2a; }
+.q-fc-opt.wrong { background: #FFD6D6; border-color: #c40; }
+
+/* letter-fill · 字母表填空 (笔试一) */
+.q-letter-fill-grid { display: flex; flex-direction: column; gap: 10px; }
+.q-letter-fill-row {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--white); border: 2px solid var(--ink); border-radius: var(--r);
+  padding: 10px 12px; box-shadow: 2px 2px 0 var(--ink); flex-wrap: wrap;
+}
+.q-lf-letter, .q-lf-blank, .q-lf-arrow {
+  font-family: var(--font-en); font-weight: 700; font-size: 1.2rem;
+}
+.q-lf-blank { color: var(--pink); font-size: 1.6rem; }
+.q-lf-options { display: flex; gap: 6px; margin-left: auto; flex-wrap: wrap; }
+.q-lf-opt {
+  padding: 4px 10px; border: 2px solid var(--ink); border-radius: var(--r-sm);
+  background: var(--cream); cursor: pointer; font-family: inherit; font-size: 0.9rem;
+}
+.q-lf-opt.selected { background: var(--pink); color: var(--white); }
+.q-lf-opt.correct-answer { background: #c8f0c8; border-color: #2a7a2a; }
+.q-lf-opt.wrong { background: #FFD6D6; border-color: #c40; }
+
+/* pic-sentence-choose · 图+句子选 A/B (笔试三) */
+.quiz-item--pic-sent { flex-direction: row; align-items: center; gap: 12px; }
+.q-ps-image { flex-shrink: 0; width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; background: var(--cream); border-radius: var(--r-sm); overflow: hidden; padding: 4px; box-sizing: border-box; }
+.q-ps-img { width: 100%; height: 100%; object-fit: contain; }
+/* 多 emoji 串自适应:用 clamp 字号 · word-break 允许中间换行 · max 占满 cell */
+.q-ps-emoji {
+  font-size: clamp(0.9rem, 5.5vw, 2rem);
+  line-height: 1.05;
+  max-width: 100%;
+  word-break: break-all;
+  text-align: center;
+  letter-spacing: -0.02em;
+}
+.q-ps-options { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.q-ps-opt {
+  text-align: left; padding: 6px 12px;
+  border: 2px solid var(--ink); border-radius: var(--r-sm);
+  background: var(--white); cursor: pointer; font-family: inherit;
+}
+.q-ps-opt .letter { font-family: var(--font-en); font-weight: 700; margin-right: 4px; }
+.q-ps-opt.selected { background: var(--pink); color: var(--white); }
+.q-ps-opt.correct-answer { background: #c8f0c8; border-color: #2a7a2a; }
+.q-ps-opt.wrong { background: #FFD6D6; border-color: #c40; }
+
+/* dialog-line-fill · 对话整句填空(从 A-E 词库选)(笔试六) */
+.q-dlf-pool {
+  background: var(--cream); border: 2px dashed var(--ink); border-radius: var(--r);
+  padding: 10px 14px; margin-bottom: 12px;
+}
+.q-dlf-pool-item { margin: 3px 0; font-family: var(--font-en); font-size: 0.95rem; }
+.q-dlf-pool-id { color: var(--pink); }
+.q-dlf-dialog {
+  background: var(--white); border: 2px solid var(--ink); border-radius: var(--r);
+  padding: 14px 18px; font-family: var(--font-en); line-height: 2;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+.q-dlf-line { margin: 6px 0; }
+.q-dlf-speaker { color: var(--pink); }
+.q-dlf-blank-no { color: var(--ink-light); font-size: 0.75rem; margin: 0 6px; }
+.q-dlf-opts { display: inline-flex; gap: 4px; }
+.q-dlf-opt {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 2px solid var(--ink); background: var(--cream);
+  font-family: var(--font-en); font-weight: 700; cursor: pointer;
+}
+.q-dlf-opt.selected { background: var(--pink); color: var(--white); }
+.q-dlf-opt.correct-answer { background: #c8f0c8; border-color: #2a7a2a; }
+.q-dlf-opt.wrong { background: #FFD6D6; border-color: #c40; }
+
+/* listen-pic-choose: 听录音 → 3 图选 1(对齐真卷听力一) */
+.quiz-item--pic-choose {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px 12px;
+}
+.q-pc-audio {
+  display: flex;
+  justify-content: center;
+}
+.q-pc-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.q-pc-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px;
+  min-height: 120px;
+  background: var(--white);
+  border: 2px solid var(--ink);
+  border-radius: var(--r);
+  cursor: pointer;
+  box-shadow: 2px 2px 0 var(--ink);
+  transition: transform .1s, background .2s;
+  font-family: inherit;
+}
+.q-pc-option:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--ink); }
+.q-pc-option.selected {
+  background: var(--pink);
+  color: var(--white);
+}
+.q-pc-option.correct { background: #c8f0c8; border-color: #2a7a2a; }
+.q-pc-option.wrong   { background: #FFD6D6; border-color: #c40; }
+.q-pc-letter {
+  font-family: var(--font-en);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.q-pc-img {
+  width: 100%;
+  height: 110px;
+  object-fit: contain;
+  border-radius: var(--r-sm);
+  background: var(--cream);
+}
+.q-pc-emoji {
+  font-size: clamp(1rem, 6vw, 2.2rem);
+  line-height: 1.1;
+  max-width: 100%;
+  word-break: break-all;
+  text-align: center;
+  letter-spacing: -0.02em;
+}
+.q-pc-label {
+  font-family: var(--font-en);
+  font-size: 0.85rem;
+  color: inherit;
+}
+@media (max-width: 640px) {
+  .q-pc-options { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .q-pc-option { min-height: 100px; padding: 4px; }
+  .q-pc-img { height: 80px; }
+}
+
+/* listen-order 顶部紧凑控制条(播放按钮 + 提示) · 不用 .quiz-item 卡片 */
+.q-order-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-shrink: 0;
+  padding: 4px 0;
+  flex-wrap: wrap;
+}
+.q-order-hint {
+  color: var(--ink-light);
+  font-size: 0.85rem;
+}
+
 .q-order-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, 1fr);
   gap: 12px;
   width: 100%;
+  /* 填满 quiz-body 剩余高度,配合 cell/img 的 min-height:0 实现 6 图一屏自适应 */
+  flex: 1;
+  min-height: 0;
 }
 .q-order-cell {
   background: var(--white);
@@ -3448,19 +3780,33 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-height: 0;
 }
 .q-order-cell img {
   width: 100%;
-  aspect-ratio: 16/10;
-  object-fit: cover;
+  /* 占 cell 剩余空间,保持比例完整显示(不裁剪,不拉伸) */
+  flex: 1;
+  min-height: 0;
+  object-fit: contain;
   border-radius: var(--r-sm);
   display: block;
   background: var(--cream);
+}
+.q-order-emoji {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  background: var(--cream);
+  border-radius: var(--r-sm);
 }
 .q-order-nums {
   display: flex;
   gap: 4px;
   justify-content: center;
+  flex-shrink: 0;
 }
 .q-order-num {
   width: 28px; height: 28px;
@@ -3477,7 +3823,10 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
 .q-order-num.wrong    { background: var(--error); color: var(--white); }
 .q-order-num.correct-answer { outline: 2px solid var(--success); }
 @media (max-width: 700px) {
-  .q-order-grid { grid-template-columns: repeat(2, 1fr); }
+  .q-order-grid {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+  }
 }
 
 /* 底部：操作条 */

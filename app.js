@@ -985,9 +985,10 @@
         // 重渲导航指示 + 句子
         main.replaceChild(buildSentenceNav(), main.firstChild);
         renderListenSentence(container, LESSON.sentences[i]);
-        await highlightAndSpeak(LESSON.sentences[i].en, container.querySelector('.sentence-display'));
+        // 连播稍慢(0.85)+ 句间停顿 1500ms,给孩子跟读/反应时间
+        await highlightAndSpeak(LESSON.sentences[i].en, container.querySelector('.sentence-display'), { rate: 0.85 });
         if (my !== audioEpoch()) return;
-        await sleep(600);
+        await sleep(1500);
       }
       if (my !== audioEpoch()) return;
       rebuildActions('done');
@@ -1014,13 +1015,14 @@
   }
 
   // 逐词高亮 + 整句 TTS（基于字符长度估算时长 · 可被 stopAllAudio 打断）
-  async function highlightAndSpeak(text, containerEl) {
+  async function highlightAndSpeak(text, containerEl, opts = {}) {
     if (!containerEl) return;
     const spans = containerEl.querySelectorAll('.word');
     const words = text.split(/\s+/).filter(Boolean);
     const my = audioEpoch();
-    const spokenPromise = speak(text);
-    const MS_PER_CHAR = 80;
+    const spokenPromise = speak(text, opts);
+    // rate 小于 1 → 每字符估算时长相应变长(节奏和 MP3 对齐)
+    const MS_PER_CHAR = Math.round(80 / (opts.rate || 1));
     for (let i = 0; i < spans.length; i++) {
       if (my !== audioEpoch()) {
         spans.forEach(s => s.classList.remove('highlight'));
@@ -1037,6 +1039,7 @@
 
   /* -------- 关 2: 跟一跟 -------- */
   function stageFollow() {
+    stopAllAudio();    // 进入/切句时先停所有音频,避免和上句 audio 打架
     const main = $('#lesson-main');
     main.innerHTML = '';
     const s = LESSON.sentences[LESSON.sentenceIdx];
@@ -1088,10 +1091,12 @@
     main.appendChild(secondaryRow);
 
     teacherBtn.addEventListener('click', () => {
+      stopAllAudio();                     // 打断任何正在播的"听我的"/TTS
       statusEl.textContent = '🔊 老师读中...';
       speak(s.en);
     });
     slowBtn.addEventListener('click', () => {
+      stopAllAudio();
       statusEl.textContent = '🐢 老师慢读...';
       speak(s.en, { rate: 0.55 });
     });
@@ -1122,13 +1127,11 @@
           if (followBlob.size >= 200) {
             myBtn.disabled = false;
             compareBtn.disabled = false;
-            // 未识别出结果时才显示自动回放
+            // 不再自动回放(之前会和"听我的"按钮重复,放两遍)
+            // 识别已出结果时保持结果文案,否则提示用户主动播
             if (!followRecDone) {
-              statusEl.textContent = '🎉 录了 ' + (durMs / 1000).toFixed(1) + '秒 · 自动回放中...';
+              statusEl.textContent = '🎉 录了 ' + (durMs / 1000).toFixed(1) + '秒 · 按 🔊 听我的 回放,或 👂 对比听';
               statusEl.style.color = '#090';
-              setTimeout(() => playMyVoice(() => {
-                statusEl.textContent = '✅ 听到自己的了吗?按 👂 跟老师比,或重录';
-              }), 200);
             }
           } else {
             statusEl.textContent = '⚠️ 没录到声音(' + followBlob.size + 'B) · 检查麦克风权限';
@@ -1178,14 +1181,19 @@
 
     function playMyVoice(onEnd) {
       if (!followUrl) return;
+      stopCurrent();                      // 停任何正在播的 MP3/TTS
       const a = new Audio(followUrl);
-      a.onended = () => onEnd && onEnd();
+      currentAudio = a;                   // ⭐ 注册到全局 currentAudio,让 stopCurrent 能停掉它
+      const cleanup = () => { if (currentAudio === a) currentAudio = null; };
+      a.onended = () => { cleanup(); onEnd && onEnd(); };
       a.onerror = () => {
+        cleanup();
         statusEl.textContent = '⚠️ 播放失败';
         statusEl.style.color = '#c40';
         onEnd && onEnd();
       };
       a.play().catch(err => {
+        cleanup();
         statusEl.textContent = '⚠️ 播放被拦截 · 再点 "🔊 听我的"';
         statusEl.style.color = '#c80';
         onEnd && onEnd();
@@ -1198,11 +1206,13 @@
         try { if (followRec) followRec.abort(); } catch(e){}
         followMediaRecorder.stop();
       } else {
+        stopAllAudio();                   // 开始录音前停老师/我的/TTS,避免录进扬声器
         startRec();
       }
     });
 
     myBtn.addEventListener('click', () => {
+      stopAllAudio();                     // 打断老师/TTS/其他
       statusEl.textContent = '🔊 回放中...';
       statusEl.style.color = '#06a';
       playMyVoice(() => { statusEl.textContent = '✅ 听完了'; statusEl.style.color = '#090'; });
@@ -1210,10 +1220,14 @@
 
     compareBtn.addEventListener('click', async () => {
       if (!followUrl) return;
+      stopAllAudio();
+      const ep = audioEpoch();
       statusEl.textContent = '🔊 老师先读...';
       statusEl.style.color = '#06a';
       await speak(s.en);
+      if (ep !== audioEpoch()) return;   // 中途被打断(切句/另一个按钮)就不继续播我的
       await sleep(400);
+      if (ep !== audioEpoch()) return;
       statusEl.textContent = '🎤 轮到你的录音...';
       playMyVoice(() => { statusEl.textContent = '✅ 对比完了 · 像不像?'; statusEl.style.color = '#090'; });
     });
@@ -1222,7 +1236,9 @@
     main.appendChild(h('div', { style: 'color: var(--ink-light); margin-top: 24px; text-align: center;' }, '家长评分 → 进下一句:'));
     main.appendChild(makeStarRating(n => {
       LESSON.stageStars.follow = Math.max(LESSON.stageStars.follow, n);
-      // 清理当前句的录音资源
+      // 清理当前句:停所有音频 + 停识别 + 停录音 + 释放麦克风
+      stopAllAudio();
+      try { if (followRec) followRec.abort(); } catch(e){}
       if (followMediaRecorder && followMediaRecorder.state === 'recording') { try { followMediaRecorder.stop(); } catch(e){} }
       if (followStream) followStream.getTracks().forEach(t => t.stop());
       if (followUrl) URL.revokeObjectURL(followUrl);
@@ -1668,9 +1684,10 @@
       score: earned,
       date: today,
     };
-    // 任务板打卡
+    // 任务板打卡:按 unit 分开记(同一天切 unit 不会串绿色)
     STATE.tasksDone[today] = STATE.tasksDone[today] || {};
-    STATE.tasksDone[today].lesson = true;
+    const lessonKey = LESSON.unit ? ('lesson_u' + LESSON.unit) : 'lesson';
+    STATE.tasksDone[today][lessonKey] = true;
     saveState();
 
     renderResult({ stars: totalStars, score: earned, day: LESSON.day });
@@ -1944,12 +1961,18 @@
     // —— 数据卡 ——
     const dataCard = h('div', { class: 'settings-card' },
       h('h3', {}, '💾 数据'),
-      h('div', { class: 'hint' }, '清零所有进度（金币、星星、错题库）。')
+      h('div', { class: 'hint' }, '强制刷新 = 只清离线缓存,学习进度保留。')
     );
+    dataCard.appendChild(h('div', { class: 'settings-row' },
+      h('div', { class: 'label' }, '拿最新版'),
+      h('div', { class: 'control' },
+        h('button', { class: 'btn btn--sm btn--mint', onclick: forceRefreshApp }, '🔄 强制刷新')
+      )
+    ));
     dataCard.appendChild(h('div', { class: 'settings-row' },
       h('div', { class: 'label' }, '重置进度'),
       h('div', { class: 'control' },
-        h('button', { class: 'btn btn--sm btn--coral', onclick: confirmReset }, '🗑 清空')
+        h('button', { class: 'btn btn--sm btn--coral', onclick: confirmReset }, '🗑 清空全部')
       )
     ));
     page.appendChild(dataCard);
@@ -2109,6 +2132,37 @@
           renderSettings();
           toast('已重置');
         }}, '清零')
+      )
+    ));
+  }
+
+  // 强制从网络拿最新版:清 SW + caches,但不清 localStorage(进度保留)
+  // 给 iPad 青少年模式等 ?reset=1 URL 不好用的场景当按钮入口
+  async function forceRefreshApp() {
+    const m = modal(h('div', {},
+      h('h3', {}, '🔄 拿最新版'),
+      h('p', {}, '清离线缓存 + 重新拉新版。进度、金币、设置都保留。'),
+      h('p', { style: 'font-size: 0.85rem; color: var(--ink-light);' }, '清理后会自动刷新页面。'),
+      h('div', { class: 'modal-footer' },
+        h('button', { class: 'btn', onclick: () => m.close() }, '取消'),
+        h('button', { class: 'btn btn--mint', onclick: async () => {
+          m.close();
+          toast('清缓存中...');
+          try {
+            if ('caches' in window) {
+              const keys = await caches.keys();
+              await Promise.all(keys.map(k => caches.delete(k).catch(() => {})));
+            }
+          } catch(e) { console.warn('caches clear fail', e); }
+          try {
+            if (navigator.serviceWorker) {
+              const regs = await navigator.serviceWorker.getRegistrations();
+              await Promise.all(regs.map(r => r.unregister().catch(() => {})));
+            }
+          } catch(e) { console.warn('sw unregister fail', e); }
+          // 路径加时间戳绕 HTTP 缓存,确保拉新 index.html
+          location.replace(location.pathname + '?_=' + Date.now());
+        }}, '🔄 立刻刷新')
       )
     ));
   }
@@ -2357,33 +2411,55 @@
     const screen = $('#screen-quiz');
     screen.innerHTML = '';
     const bank = QUIZ_BANKS[unit];
+    const papers = (typeof QUIZ_PAPERS !== 'undefined' && QUIZ_PAPERS[unit]) || null;
+
     const page = h('div', { class: 'quiz-mode-picker' },
       h('h2', {}, `📝 ${bank.title}`),
-      h('p', { style: 'color: var(--ink-light);' }, '选个做题模式：'),
-      h('div', { class: 'quiz-mode-grid' },
-        (() => {
-          const c = h('div', { class: 'quiz-mode-card' },
-            h('div', { class: 'icon' }, '🎯'),
-            h('div', { class: 'name' }, '模拟考试'),
-            h('div', { class: 'desc' }, '提交前不能看答案，考完才批卷。接近真考场氛围。')
-          );
-          c.addEventListener('click', () => startQuizSession(unit, 'exam'));
-          return c;
-        })(),
-        (() => {
-          const c = h('div', { class: 'quiz-mode-card' },
-            h('div', { class: 'icon' }, '📚'),
-            h('div', { class: 'name' }, '练习模式'),
-            h('div', { class: 'desc' }, '做完每大题立刻看对错，可以重试，降低焦虑。')
-          );
-          c.addEventListener('click', () => startQuizSession(unit, 'practice'));
-          return c;
-        })()
-      ),
-      h('div', { style: 'margin-top: 24px;' },
-        h('button', { class: 'btn btn--sm', onclick: renderQuizPicker }, '‹ 换单元')
-      )
+      h('p', { style: 'color: var(--ink-light);' }, '选个做题模式:')
     );
+
+    // —— 模式卡(模拟考 + 练习) ——
+    const modeGrid = h('div', { class: 'quiz-mode-grid' });
+    const examCard = h('div', { class: 'quiz-mode-card' },
+      h('div', { class: 'icon' }, '🎯'),
+      h('div', { class: 'name' }, '模拟考试'),
+      h('div', { class: 'desc' }, '提交前不能看答案,考完才批卷。接近真考场氛围。')
+    );
+    examCard.addEventListener('click', () => startQuizSession(unit, 'exam'));
+    const practiceCard = h('div', { class: 'quiz-mode-card' },
+      h('div', { class: 'icon' }, '📚'),
+      h('div', { class: 'name' }, '练习模式'),
+      h('div', { class: 'desc' }, '做完每大题立刻看对错,可以重试,降低焦虑。')
+    );
+    practiceCard.addEventListener('click', () => startQuizSession(unit, 'practice'));
+    modeGrid.append(examCard, practiceCard);
+    page.appendChild(modeGrid);
+
+    // —— 固定卷入口(QUIZ_PAPERS 有本 unit 才显示) ——
+    if (papers && papers.length > 0) {
+      page.appendChild(h('div', {
+        style: 'margin-top: 20px; padding-top: 16px; border-top: 2px dashed var(--ink-light);'
+      },
+        h('p', { style: 'color: var(--ink-light); margin-bottom: 10px;' },
+          '📄 或选一套固定卷(题目与答案位置固定,适合严肃测试):')
+      ));
+      const paperGrid = h('div', { class: 'quiz-mode-grid' });
+      const paperIcons = ['📘','📗','📕'];
+      papers.forEach((p, i) => {
+        const card = h('div', { class: 'quiz-mode-card' },
+          h('div', { class: 'icon' }, paperIcons[i] || '📄'),
+          h('div', { class: 'name' }, p.title.replace(/^.*·\s*/, '卷 ').replace('卷 ','')),
+          h('div', { class: 'desc' }, p.subtitle || '')
+        );
+        card.addEventListener('click', () => startQuizSession(unit, 'exam', p.id));
+        paperGrid.appendChild(card);
+      });
+      page.appendChild(paperGrid);
+    }
+
+    page.appendChild(h('div', { style: 'margin-top: 24px;' },
+      h('button', { class: 'btn btn--sm', onclick: renderQuizPicker }, '‹ 换单元')
+    ));
     screen.appendChild(page);
   }
 
@@ -2394,8 +2470,11 @@
     mode: 'practice',   // 'exam' | 'practice'
   };
 
-  function startQuizSession(unit, mode) {
-    const paper = generateQuizPaper(unit);
+  function startQuizSession(unit, mode, paperId) {
+    // paperId 非空:用固定卷(QUIZ_PAPERS) · 否则从 bank 随机抽(现有行为)
+    const paper = paperId && typeof generatePaperById === 'function'
+      ? generatePaperById(unit, paperId)
+      : generateQuizPaper(unit);
     if (!paper || !paper.sections.length) {
       toast('题库准备中'); return;
     }
@@ -2406,6 +2485,10 @@
   }
 
   function renderQuizSection() {
+    // 记住滚动位置 · 真正的滚容器是 .quiz-body (styles.css:1622 overflow-y:auto)
+    // 选答案后 renderQuizSection 会重建整个 .quiz-body,scrollTop 归零 → 页面跳顶
+    const prevQuizBody = document.querySelector('.quiz-body');
+    const prevScroll = prevQuizBody ? prevQuizBody.scrollTop : 0;
     switchScreen('quiz');
     hideCoach();
     const screen = $('#screen-quiz');
@@ -2433,6 +2516,11 @@
       return;
     }
     renderer(section, body);
+    // 恢复滚动位置:新建的 body 就是新 .quiz-body,直接给它 scrollTop
+    // rAF 保证布局完才 set
+    if (prevScroll > 0) {
+      requestAnimationFrame(() => { body.scrollTop = prevScroll; });
+    }
   }
 
   function buildQuizHeader(section) {
@@ -2494,12 +2582,20 @@
       if (full) correctCount++;
       const itemScored = partialScore(section.type, item, user, section.pointsPerItem);
       totalScored += itemScored;
-      // 错题入库（记录 audio ref id 级别的参考）
+      // 错题入库
       if (!full && user !== undefined && user !== null) {
-        if (item.audio && /^(sent|vocab):/.test(item.audio)) {
-          const refId = item.audio.split(':')[1];
-          markWrong(refId);
+        // 1. 老逻辑:从 audio/image 提 sent/vocab id (能映射到具体词/句的入库)
+        let refId = null;
+        for (const field of ['audio', 'image']) {
+          const v = item[field];
+          if (typeof v === 'string' && /^(sent|vocab):/.test(v)) {
+            refId = v.split(':')[1];
+            break;
+          }
         }
+        if (refId) markWrong(refId);
+        // 2. 新: quiz 题本身入库 (覆盖所有题型 · 含听四/六、笔一/六 这种没 ref 的)
+        markQuizWrong(item, section, user);
       }
     });
     section.graded = true;
@@ -2524,7 +2620,9 @@
     if (type === 'listen-choose') return user === item.correct;
     if (type === 'listen-judge')  return user === item.correct;
     if (type === 'listen-pic')    return user === item.correct;
+    if (type === 'listen-pic-choose') return user === item.correct;
     if (type === 'pic-judge')     return user === item.correct;
+    if (type === 'pic-sentence-choose') return user === item.correct;
     if (type === 'odd-one-out')   return user === item.correct;
     if (type === 'scenario')      return user === item.correct;
     if (type === 'letter-neighbor') {
@@ -2535,6 +2633,22 @@
       if (!user || typeof user !== 'object') return false;
       return item.pairs.every((_, i) => user[i] === i);
     }
+    if (type === 'listen-match-pic') {
+      // user = { personId: targetId }
+      if (!user || typeof user !== 'object') return false;
+      return (item.persons || []).every(p => user[p.id] === p.expectedTarget);
+    }
+    if (type === 'listen-fill-choose' || type === 'letter-fill') {
+      // user = { blankIdx: optIdx }
+      if (!user || typeof user !== 'object') return false;
+      return (item.blanks || []).every((b, i) => user[i] === b.correct);
+    }
+    if (type === 'dialog-line-fill') {
+      // user = { blankIdx: poolId(A-E) }
+      if (!user || typeof user !== 'object') return false;
+      const ans = item.answers || {};
+      return Object.keys(ans).every(k => user[k] === ans[k]);
+    }
     if (type === 'dialog-fill' || type === 'listen-fill') {
       if (!user || typeof user !== 'object') return false;
       const blanks = [];
@@ -2543,39 +2657,175 @@
     }
     if (type === 'listen-response') return user === item.correct;
     if (type === 'listen-order') {
-      // user = { imgIdx: orderNumber(1-6) }
+      // user = { imgIdx: orderNumber }
       if (!user || typeof user !== 'object') return false;
-      return item.images.every((imgRef, imgIdx) => {
-        const expectedPos = item.sequence.indexOf(imgRef) + 1;  // 1-based
-        return user[imgIdx] === expectedPos;
+      return (item.images || []).every((img, idx) => {
+        // 支持新结构 { image, correctOrder } 和老结构 string
+        const expected = (typeof img === 'object' && img && img.correctOrder != null)
+          ? img.correctOrder
+          : (item.sequence.indexOf(typeof img === 'string' ? img : img.image) + 1);
+        return user[idx] === expected;
       });
     }
     // 其他暂未实现
     return user === item.correct;
   }
 
-  // 辅助：统计部分得分（match-columns 和 dialog-fill 按连对/填对比例给分）
+  // —— quiz 错题入库 (任何题型,即使没 sent/vocab ref) ——
+  function markQuizWrong(item, section, user) {
+    if (!item || !item.id) return;
+    const id = 'qz:' + item.id;
+    STATE.mistakeBank = STATE.mistakeBank || {};
+    const m = STATE.mistakeBank[id] || { wrong: 0 };
+    m.wrong++;
+    m.lastWrong = new Date().toISOString().slice(0, 10);
+    m.quizSnapshot = {
+      sectionTitle: section.title,
+      type: section.type,
+      item,                                     // 原题(含 explanation 字段如有)
+      userAns: user,
+      userText: formatUserAnswer(section.type, item, user),
+      correctText: formatCorrectAnswer(section.type, item),
+    };
+    STATE.mistakeBank[id] = m;
+    saveState();
+  }
+
+  // —— 答案格式化(review/错题集 显示用) ——
+  const ABCD = ['A', 'B', 'C', 'D', 'E'];
+  function formatUserAnswer(type, item, user) {
+    if (user == null || user === '') return '未答';
+    switch (type) {
+      case 'listen-choose':
+      case 'listen-response':
+      case 'listen-pic-choose':
+      case 'pic-sentence-choose':
+      case 'odd-one-out':
+      case 'scenario':
+        return ABCD[user] || String(user);
+      case 'listen-judge':
+      case 'pic-judge':
+        return user ? '✓' : '✗';
+      case 'listen-order':
+        if (typeof user !== 'object') return String(user);
+        return Object.keys(user).sort((a,b)=>+a-+b).map(k => `图${+k+1}=${user[k]}`).join(' ');
+      case 'listen-match-pic':
+        if (typeof user !== 'object') return String(user);
+        return Object.entries(user).map(([k,v]) => `${k}→${v}`).join(' ');
+      case 'listen-fill-choose':
+      case 'letter-fill':
+        if (typeof user !== 'object') return String(user);
+        return Object.keys(user).sort((a,b)=>+a-+b).map(k => `(${+k+1})${ABCD[user[k]]}`).join(' ');
+      case 'dialog-line-fill':
+        if (typeof user !== 'object') return String(user);
+        return Object.keys(user).sort((a,b)=>+a-+b).map(k => `(${+k+1})${user[k]}`).join(' ');
+      case 'match-columns':
+        if (typeof user !== 'object') return String(user);
+        return Object.entries(user).map(([k,v]) => `${+k+1}→${(item.pairs?.[v]?.a || '?')}`).join(' · ');
+      case 'dialog-fill':
+      case 'listen-fill':
+        if (typeof user !== 'object') return String(user);
+        return Object.values(user).join(' / ');
+      case 'letter-neighbor':
+        if (typeof user !== 'object') return String(user);
+        return `${user.before||'?'} ${item.letter} ${user.after||'?'}`;
+      default:
+        return String(user);
+    }
+  }
+  function formatCorrectAnswer(type, item) {
+    switch (type) {
+      case 'listen-choose':
+      case 'listen-response':
+      case 'listen-pic-choose':
+      case 'pic-sentence-choose':
+      case 'odd-one-out':
+      case 'scenario':
+        return ABCD[item.correct] || String(item.correct);
+      case 'listen-judge':
+      case 'pic-judge':
+        return item.correct ? '✓' : '✗';
+      case 'listen-order':
+        return (item.images || []).map((img, idx) => {
+          const expected = (typeof img === 'object' && img && img.correctOrder != null)
+            ? img.correctOrder
+            : (item.sequence.indexOf(typeof img === 'string' ? img : img.image) + 1);
+          return `图${idx+1}=${expected}`;
+        }).join(' ');
+      case 'listen-match-pic':
+        return (item.persons || []).map(p => `${p.id}→${p.expectedTarget}`).join(' ');
+      case 'listen-fill-choose':
+      case 'letter-fill':
+        return (item.blanks || []).map((b, i) => `(${i+1})${ABCD[b.correct]}`).join(' ');
+      case 'dialog-line-fill': {
+        const ans = item.answers || {};
+        return Object.keys(ans).sort((a,b)=>+a-+b).map(k => `(${+k+1})${ans[k]}`).join(' ');
+      }
+      case 'match-columns':
+        return (item.pairs || []).map((p, i) => `${i+1}→${p.a}`).join(' · ');
+      case 'dialog-fill':
+      case 'listen-fill': {
+        const blanks = [];
+        item.dialog.forEach(line => line.parts.forEach(p => { if (p.blank) blanks.push(p.blank); }));
+        return blanks.join(' / ');
+      }
+      case 'letter-neighbor':
+        return `${item.before} ${item.letter} ${item.after}`;
+      default:
+        return '';
+    }
+  }
+  // 取题面摘要(列表展示用)
+  function quizItemSummary(type, item) {
+    if (item.audioText) return item.audioText;
+    if (item.scene) return item.scene;
+    if (item.text) return item.text;
+    if (Array.isArray(item.items)) return item.items.join(' / ');
+    if (item.letter) return `字母: ${item.letter}`;
+    if (item.audio) return item.audio;
+    if (item.image) return item.image;
+    return item.id;
+  }
+
+  // 辅助：统计部分得分（多空题按对的空数给分）
   function partialScore(type, item, user, pointsPerItem) {
     if (type === 'match-columns') {
       if (!user) return 0;
-      const correctCount = item.pairs.reduce((n, _, i) => n + (user[i] === i ? 1 : 0), 0);
-      // 每对 2 分（pointsPerItem 是整组总分 12，对应 6 对 × 2）
-      return correctCount * 2;
+      const cnt = item.pairs.reduce((n, _, i) => n + (user[i] === i ? 1 : 0), 0);
+      return cnt * 2;
     }
     if (type === 'dialog-fill' || type === 'listen-fill') {
       if (!user) return 0;
       const blanks = [];
       item.dialog.forEach(line => line.parts.forEach(p => { if (p.blank) blanks.push(p.blank); }));
-      const correctCount = blanks.reduce((n, ans, i) => n + (user[i] === ans ? 1 : 0), 0);
-      return correctCount * 2;  // 每空 2 分
+      const cnt = blanks.reduce((n, ans, i) => n + (user[i] === ans ? 1 : 0), 0);
+      return cnt * 2;
     }
     if (type === 'listen-order') {
       if (!user) return 0;
-      const correctCount = item.images.reduce((n, imgRef, imgIdx) => {
-        const expected = item.sequence.indexOf(imgRef) + 1;
-        return n + (user[imgIdx] === expected ? 1 : 0);
+      const cnt = (item.images || []).reduce((n, img, idx) => {
+        const expected = (typeof img === 'object' && img && img.correctOrder != null)
+          ? img.correctOrder
+          : (item.sequence.indexOf(typeof img === 'string' ? img : img.image) + 1);
+        return n + (user[idx] === expected ? 1 : 0);
       }, 0);
-      return correctCount * 2;  // 每对 2 分
+      return cnt * pointsPerItem;
+    }
+    if (type === 'listen-match-pic') {
+      if (!user) return 0;
+      const cnt = (item.persons || []).filter(p => user[p.id] === p.expectedTarget).length;
+      return cnt * pointsPerItem;
+    }
+    if (type === 'listen-fill-choose' || type === 'letter-fill') {
+      if (!user) return 0;
+      const cnt = (item.blanks || []).filter((b, i) => user[i] === b.correct).length;
+      return cnt * pointsPerItem;
+    }
+    if (type === 'dialog-line-fill') {
+      if (!user) return 0;
+      const ans = item.answers || {};
+      const cnt = Object.keys(ans).filter(k => user[k] === ans[k]).length;
+      return cnt * pointsPerItem;
     }
     return isItemCorrect(type, item, user) ? pointsPerItem : 0;
   }
@@ -2625,22 +2875,26 @@
     const totalPossible = paper.sections.reduce((s, sec) => s + sec.items.length * sec.pointsPerItem, 0);
     const finalPct = totalPossible > 0 ? Math.round(totalScored / totalPossible * 100) : 0;
 
-    // 存进度
-    STATE.unitTests = STATE.unitTests || {};
-    const prev = STATE.unitTests[paper.unit];
-    STATE.unitTests[paper.unit] = {
-      bestScore: Math.max(prev?.bestScore || 0, finalPct),
-      lastScore: finalPct,
-      lastDate: new Date().toISOString().slice(0, 10),
-      lastTotal: totalScored,
-      lastPossible: totalPossible,
-    };
-    // 积分
-    let earned = finalPct >= 60 ? 5 : 2;
-    if (finalPct >= 90) earned += 3;
-    STATE.score += earned;
-    saveState();
-    renderTopbar();
+    // 计分 + 存进度只做一次(从 review 视图返回时不重复)
+    let earned = paper._earnedCoins || 0;
+    if (!paper._scoringDone) {
+      STATE.unitTests = STATE.unitTests || {};
+      const prev = STATE.unitTests[paper.unit];
+      STATE.unitTests[paper.unit] = {
+        bestScore: Math.max(prev?.bestScore || 0, finalPct),
+        lastScore: finalPct,
+        lastDate: new Date().toISOString().slice(0, 10),
+        lastTotal: totalScored,
+        lastPossible: totalPossible,
+      };
+      earned = finalPct >= 60 ? 5 : 2;
+      if (finalPct >= 90) earned += 3;
+      STATE.score += earned;
+      saveState();
+      renderTopbar();
+      paper._scoringDone = true;
+      paper._earnedCoins = earned;
+    }
 
     switchScreen('quiz');
     const screen = $('#screen-quiz');
@@ -2664,12 +2918,87 @@
         })
       ),
       h('div', { class: 'result-actions', style: 'margin-top: 20px;' },
+        h('button', { class: 'btn btn--lg btn--mint', onclick: renderQuizPaperReview }, '📋 查看答卷'),
         h('button', { class: 'btn btn--lg btn--pink', onclick: goHome }, '🏠 回主页'),
         h('button', { class: 'btn btn--lg btn--blue', onclick: renderQuizPicker }, '🔁 再测')
       )
     );
     screen.appendChild(page);
     spawnConfetti(finalPct >= 90 ? 80 : 30);
+  }
+
+  // —— 全卷答卷回看(对错红绿 + 标答) ——
+  function renderQuizPaperReview() {
+    const paper = QUIZ.paper;
+    if (!paper) return;
+    switchScreen('quiz');
+    const screen = $('#screen-quiz');
+    screen.innerHTML = '';
+    const shell = h('div', { class: 'quiz-shell quiz-review-shell' });
+
+    // 顶栏:标题 + 总分 + 返回
+    const totalScored = paper.sections.reduce((s, sec) => s + (sec.scored || 0), 0);
+    const totalPossible = paper.sections.reduce((s, sec) => s + sec.items.length * sec.pointsPerItem, 0);
+    shell.appendChild(h('div', { class: 'quiz-review-header' },
+      h('h2', { style: 'margin: 0; flex: 1;' }, `📋 ${paper.title} · 答卷回看`),
+      h('div', { class: 'q-progress' }, `${totalScored}/${totalPossible} 分`),
+      h('button', { class: 'btn btn--sm', onclick: () => finishQuizSession() }, '‹ 返回结果')
+    ));
+
+    // 主体 · 每 section 用 review:true 渲染
+    const body = h('div', { class: 'quiz-body quiz-review-body' });
+    paper.sections.forEach(sec => {
+      const secWrap = h('div', { class: 'quiz-review-section' });
+      const total = sec.items.length * sec.pointsPerItem;
+      const scored = sec.scored || 0;
+      const okCls = scored === total ? 'qrs-full' : (scored < total * 0.6 ? 'qrs-low' : 'qrs-mid');
+      secWrap.appendChild(h('div', { class: 'quiz-review-section-head ' + okCls },
+        h('span', { class: 'qrs-title' }, sec.title),
+        h('span', { class: 'qrs-score' }, `${scored}/${total} 分`)
+      ));
+      const renderer = QUIZ_RENDERERS[sec.type];
+      if (renderer) {
+        try { renderer(sec, secWrap, { review: true }); } catch (e) {
+          secWrap.appendChild(h('div', { style: 'color:#c40; padding:8px;' }, '渲染失败: ' + e.message));
+        }
+      } else {
+        secWrap.appendChild(h('div', { style: 'color:#999; padding:8px;' }, '题型 ' + sec.type + ' 待支持'));
+      }
+      // 答案对照表 · 每题一行 (你选 X · 标答 Y · 讲解)
+      const table = h('div', { class: 'qrs-answer-table' });
+      table.appendChild(h('div', { class: 'qrs-answer-thead' },
+        h('span', { class: 'qrs-q-cell' }, '题'),
+        h('span', { class: 'qrs-user-cell' }, '你的答案'),
+        h('span', { class: 'qrs-correct-cell' }, '标准答案'),
+        h('span', { class: 'qrs-result-cell' }, ''),
+      ));
+      sec.items.forEach((item, idx) => {
+        const userAns = sec.userAnswers[item.id];
+        const ok = isItemCorrect(sec.type, item, userAns);
+        const userT = formatUserAnswer(sec.type, item, userAns);
+        const correctT = formatCorrectAnswer(sec.type, item);
+        const row = h('div', { class: 'qrs-answer-row ' + (ok ? 'qrs-ok' : 'qrs-no') },
+          h('span', { class: 'qrs-q-cell' }, sec.items.length === 1 ? '本题' : `${idx + 1}`),
+          h('span', { class: 'qrs-user-cell' }, userT),
+          h('span', { class: 'qrs-correct-cell' }, correctT),
+          h('span', { class: 'qrs-result-cell' }, ok ? '✓' : '✗')
+        );
+        if (item.explanation) {
+          row.appendChild(h('span', { class: 'qrs-explain-cell' }, '💡 ' + item.explanation));
+        }
+        table.appendChild(row);
+      });
+      secWrap.appendChild(table);
+      body.appendChild(secWrap);
+    });
+    shell.appendChild(body);
+
+    // 底部:再返回
+    shell.appendChild(h('div', { class: 'quiz-review-footer' },
+      h('button', { class: 'btn btn--lg btn--pink', onclick: () => finishQuizSession() }, '‹ 返回成绩单'),
+      h('button', { class: 'btn btn--lg btn--blue', onclick: renderQuizPicker }, '🔁 再测一次')
+    ));
+    screen.appendChild(shell);
   }
 
   /* ============================================================
@@ -2684,7 +3013,7 @@
   //   没 MP3 或加载失败 → 退回 TTS 念 fallbackText
   //   fallbackText 不传就从 ref 提字（vocab:u4_tree → "tree"）
   //   关键：已经进入 MP3 播放通道后 error 不再 fallback，避免 MP3 + TTS 同时叠声
-  function playQuizAudio(ref, btn, fallbackText) {
+  function playQuizAudio(ref, btn, fallbackText, opts = {}) {
     const url = resolveQuizAsset(ref, 'audio');
     if (btn) btn.classList.add('playing');
     const doneBtn = () => { if (btn) btn.classList.remove('playing'); };
@@ -2697,7 +3026,7 @@
 
     const ttsFallback = () => {
       if (!ttsText) { doneBtn(); return; }
-      speakTTS(ttsText).then(doneBtn);
+      speakTTS(ttsText, { rate: opts.rate }).then(doneBtn);
     };
 
     if (!url) { ttsFallback(); return; }
@@ -2709,6 +3038,7 @@
     fetch(url, { method: 'HEAD' }).then(res => {
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const a = new Audio(url);
+      if (opts.rate) a.playbackRate = opts.rate;
       currentAudio = a;
       let playing = false;
       a.onended = () => { doneBtn(); if (currentAudio === a) currentAudio = null; };
@@ -2750,13 +3080,324 @@
         btn.addEventListener('click', () => {
           section.userAnswers[item.id] = i;
           onPick && onPick(i, btn);
-          renderQuizSection();  // 重渲保持 selected 状态
+          // 只更新当前组按钮的 selected class,不重渲整 section
+          // (重渲 DOM 会让滚动位置归零,用户在长题滚下去选一个又跳回顶部)
+          wrap.querySelectorAll('.q-choice').forEach((b, bi) => {
+            b.classList.toggle('selected', bi === i);
+          });
         });
       }
       wrap.appendChild(btn);
     });
     return wrap;
   }
+
+  /* -------- 新: 听录音 → 人物/物品连线(真卷听力四) --------
+   *  items[0] = { persons:[{id,name,face,audioText,expectedTarget}], targets:[{id,image,label}] }
+   *  userAnswers[itemId] = { personId: targetId, ... }
+   * ---------------------------------------------------------- */
+  QUIZ_RENDERERS['listen-match-pic'] = function(section, body, opts = {}) {
+    const item = section.items[0];
+    if (!item) return;
+    const userAns = section.userAnswers[item.id] = section.userAnswers[item.id] || {};
+    const persons = item.persons || [];
+    const targets = item.targets || [];
+
+    const grid = h('div', { class: 'q-match-pic-grid' });
+    persons.forEach(p => {
+      const row = h('div', { class: 'q-match-pic-row' });
+
+      // 左: 人物 + 播放
+      const left = h('div', { class: 'q-match-pic-person' });
+      if (p.face?.startsWith('emoji:')) {
+        left.appendChild(h('div', { class: 'q-match-pic-face' }, p.face.slice(6)));
+      } else if (p.face) {
+        const u = resolveQuizAsset(p.face, 'image');
+        if (u) left.appendChild(h('img', { src: u, class: 'q-match-pic-face-img', alt: p.name }));
+      }
+      left.appendChild(h('div', { class: 'q-match-pic-name' }, p.name));
+      const audioBtn = h('button', { class: 'btn btn--sm btn--yellow' }, '🔊');
+      audioBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        playQuizAudio(p.audio || null, audioBtn, p.audioText, { rate: 0.85 });
+      });
+      left.appendChild(audioBtn);
+      row.appendChild(left);
+
+      // 右: 5 target 按钮
+      const targetRow = h('div', { class: 'q-match-pic-targets' });
+      targets.forEach(t => {
+        const btn = h('button', { class: 'q-match-pic-target', type: 'button' });
+        btn.appendChild(h('div', { class: 'q-mp-letter' }, t.id));
+        if (t.image?.startsWith('emoji:')) {
+          btn.appendChild(h('div', { class: 'q-mp-emoji' }, t.image.slice(6)));
+        } else {
+          const u = resolveQuizAsset(t.image, 'image');
+          if (u) btn.appendChild(h('img', { src: u, class: 'q-mp-timg', alt: t.label || '' }));
+        }
+        if (userAns[p.id] === t.id) btn.classList.add('selected');
+        if (opts.review) {
+          btn.disabled = true;
+          if (p.expectedTarget === t.id) btn.classList.add('correct-answer');
+          if (userAns[p.id] === t.id && t.id !== p.expectedTarget) btn.classList.add('wrong');
+        } else {
+          btn.addEventListener('click', () => {
+            userAns[p.id] = t.id;
+            targetRow.querySelectorAll('.q-match-pic-target').forEach(b => {
+              b.classList.toggle('selected', b.firstChild.textContent === t.id);
+            });
+          });
+        }
+        targetRow.appendChild(btn);
+      });
+      row.appendChild(targetRow);
+      grid.appendChild(row);
+    });
+    body.appendChild(grid);
+  };
+
+  /* -------- 新: 听对话 · 每空从 A/B 选(真卷听力六) --------
+   *  items[0] = { audioText, dialog:[{speaker, parts:[{t},{blank:N}]}], blanks:[{options:[A,B], correct}] }
+   *  userAnswers[itemId] = { blankIdx: optIdx }
+   * -------------------------------------------------------- */
+  QUIZ_RENDERERS['listen-fill-choose'] = function(section, body, opts = {}) {
+    const item = section.items[0];
+    if (!item) return;
+    const userAns = section.userAnswers[item.id] = section.userAnswers[item.id] || {};
+
+    // 顶部播放按钮
+    const audioRow = h('div', { class: 'q-order-controls' });
+    const bigBtn = h('button', { class: 'btn btn--sm btn--pink' }, '🔊 播放整段对话');
+    bigBtn.addEventListener('click', () => {
+      playQuizAudio(item.audio || null, bigBtn, item.audioText, { rate: 0.8 });
+    });
+    audioRow.appendChild(bigBtn);
+    body.appendChild(audioRow);
+
+    // 对话 + 填空(每空 2 选)
+    const wrap = h('div', { class: 'q-fill-choose-dialog' });
+    (item.dialog || []).forEach(line => {
+      const lineEl = h('div', { class: 'q-fill-choose-line' });
+      if (line.speaker) lineEl.appendChild(h('b', { class: 'q-fc-speaker' }, line.speaker + ': '));
+      (line.parts || []).forEach(p => {
+        if (p.t != null) {
+          lineEl.appendChild(document.createTextNode(p.t));
+        } else if (typeof p.blank === 'number') {
+          const bIdx = p.blank;
+          const b = item.blanks[bIdx];
+          const chip = h('span', { class: 'q-fc-chip' });
+          chip.appendChild(h('span', { class: 'q-fc-blank-no' }, '(' + (bIdx + 1) + ')'));
+          (b.options || []).forEach((optText, oi) => {
+            const btn = h('button', { class: 'q-fc-opt' }, ['A.','B.','C.','D.'][oi] + optText);
+            if (userAns[bIdx] === oi) btn.classList.add('selected');
+            if (opts.review) {
+              btn.disabled = true;
+              if (oi === b.correct) btn.classList.add('correct-answer');
+              if (userAns[bIdx] === oi && oi !== b.correct) btn.classList.add('wrong');
+            } else {
+              btn.addEventListener('click', () => {
+                userAns[bIdx] = oi;
+                chip.querySelectorAll('.q-fc-opt').forEach((bb, bbi) => bb.classList.toggle('selected', bbi === oi));
+              });
+            }
+            chip.appendChild(btn);
+          });
+          lineEl.appendChild(chip);
+        }
+      });
+      wrap.appendChild(lineEl);
+    });
+    body.appendChild(wrap);
+  };
+
+  /* -------- 新: 字母表填空(真卷笔试一) --------
+   *  items[0] = { blanks:[{before, after, options:[3], correct}] }
+   * ---------------------------------------------------------- */
+  QUIZ_RENDERERS['letter-fill'] = function(section, body, opts = {}) {
+    const item = section.items[0];
+    if (!item) return;
+    const userAns = section.userAnswers[item.id] = section.userAnswers[item.id] || {};
+
+    const grid = h('div', { class: 'q-letter-fill-grid' });
+    (item.blanks || []).forEach((b, bIdx) => {
+      const row = h('div', { class: 'q-letter-fill-row' });
+      row.appendChild(h('span', { class: 'q-lf-letter' }, b.before));
+      row.appendChild(h('span', { class: 'q-lf-arrow' }, ' → '));
+      row.appendChild(h('span', { class: 'q-lf-blank' }, '?'));
+      row.appendChild(h('span', { class: 'q-lf-arrow' }, ' → '));
+      row.appendChild(h('span', { class: 'q-lf-letter' }, b.after));
+
+      const opts2 = h('div', { class: 'q-lf-options' });
+      (b.options || []).forEach((optText, oi) => {
+        const btn = h('button', { class: 'q-lf-opt' }, ['A.','B.','C.'][oi] + ' ' + optText);
+        if (userAns[bIdx] === oi) btn.classList.add('selected');
+        if (opts.review) {
+          btn.disabled = true;
+          if (oi === b.correct) btn.classList.add('correct-answer');
+          if (userAns[bIdx] === oi && oi !== b.correct) btn.classList.add('wrong');
+        } else {
+          btn.addEventListener('click', () => {
+            userAns[bIdx] = oi;
+            opts2.querySelectorAll('.q-lf-opt').forEach((bb, bbi) => bb.classList.toggle('selected', bbi === oi));
+          });
+        }
+        opts2.appendChild(btn);
+      });
+      row.appendChild(opts2);
+      grid.appendChild(row);
+    });
+    body.appendChild(grid);
+  };
+
+  /* -------- 新: 看图选句子(真卷笔试三) --------
+   *  items = [{image, options:[text,text], correct}]
+   * ------------------------------------------------ */
+  QUIZ_RENDERERS['pic-sentence-choose'] = function(section, body, opts = {}) {
+    const LETTERS = ['A.','B.','C.','D.'];
+    section.items.forEach((item, idx) => {
+      const row = h('div', { class: 'quiz-item quiz-item--pic-sent' });
+      row.appendChild(h('div', { class: 'quiz-item__num' }, String(idx + 1)));
+
+      const left = h('div', { class: 'q-ps-image' });
+      if (item.image?.startsWith('emoji:')) {
+        left.appendChild(h('div', { class: 'q-ps-emoji' }, item.image.slice(6)));
+      } else {
+        const u = resolveQuizAsset(item.image, 'image');
+        if (u) left.appendChild(h('img', { src: u, class: 'q-ps-img', alt: '' }));
+      }
+      row.appendChild(left);
+
+      const userAns = section.userAnswers[item.id];
+      const optsBox = h('div', { class: 'q-ps-options' });
+      (item.options || []).forEach((optText, oi) => {
+        const btn = h('button', { class: 'q-ps-opt' },
+          h('span', { class: 'letter' }, LETTERS[oi]),
+          ' ' + optText
+        );
+        if (userAns === oi) btn.classList.add('selected');
+        if (opts.review) {
+          btn.disabled = true;
+          if (oi === item.correct) btn.classList.add('correct-answer');
+          if (userAns === oi && oi !== item.correct) btn.classList.add('wrong');
+        } else {
+          btn.addEventListener('click', () => {
+            section.userAnswers[item.id] = oi;
+            optsBox.querySelectorAll('.q-ps-opt').forEach((b, bi) => b.classList.toggle('selected', bi === oi));
+          });
+        }
+        optsBox.appendChild(btn);
+      });
+      row.appendChild(optsBox);
+      body.appendChild(row);
+    });
+  };
+
+  /* -------- 新: 对话整句填空(真卷笔试六) --------
+   *  items[0] = { pool:[{id:'A',text}], dialog:[{speaker, text, blank}], answers:{blankIdx:poolId} }
+   *  userAnswers[itemId] = { blankIdx: poolId }
+   * ---------------------------------------------- */
+  QUIZ_RENDERERS['dialog-line-fill'] = function(section, body, opts = {}) {
+    const item = section.items[0];
+    if (!item) return;
+    const userAns = section.userAnswers[item.id] = section.userAnswers[item.id] || {};
+
+    // 词库
+    const poolBox = h('div', { class: 'q-dlf-pool' });
+    (item.pool || []).forEach(p => {
+      poolBox.appendChild(h('div', { class: 'q-dlf-pool-item' },
+        h('b', { class: 'q-dlf-pool-id' }, p.id + '. '),
+        p.text
+      ));
+    });
+    body.appendChild(poolBox);
+
+    // 对话 · 每行支持 text(前缀) + blank(空位选项) + suffix(后缀) 组合
+    const dlg = h('div', { class: 'q-dlf-dialog' });
+    (item.dialog || []).forEach(line => {
+      const lineEl = h('div', { class: 'q-dlf-line' });
+      if (line.speaker) lineEl.appendChild(h('b', { class: 'q-dlf-speaker' }, line.speaker + ': '));
+      if (line.text) lineEl.appendChild(document.createTextNode(line.text + ' '));
+      if (line.blank) {
+        const blankIdx = line.blankIdx;
+        const optsBox = h('div', { class: 'q-dlf-opts' });
+        (item.pool || []).forEach(p => {
+          const btn = h('button', { class: 'q-dlf-opt' }, p.id);
+          if (userAns[blankIdx] === p.id) btn.classList.add('selected');
+          if (opts.review) {
+            btn.disabled = true;
+            const correct = item.answers?.[blankIdx];
+            if (p.id === correct) btn.classList.add('correct-answer');
+            if (userAns[blankIdx] === p.id && p.id !== correct) btn.classList.add('wrong');
+          } else {
+            btn.addEventListener('click', () => {
+              userAns[blankIdx] = p.id;
+              optsBox.querySelectorAll('.q-dlf-opt').forEach(b => b.classList.toggle('selected', b.textContent === p.id));
+            });
+          }
+          optsBox.appendChild(btn);
+        });
+        lineEl.appendChild(h('span', { class: 'q-dlf-blank-no' }, '(' + (blankIdx + 1) + ')'));
+        lineEl.appendChild(optsBox);
+      }
+      if (line.suffix) lineEl.appendChild(document.createTextNode(' ' + line.suffix));
+      dlg.appendChild(lineEl);
+    });
+    body.appendChild(dlg);
+  };
+
+  /* -------- 新题型: 听录音 → 3 图选 1(对齐真卷听力一) -------- */
+  QUIZ_RENDERERS['listen-pic-choose'] = function(section, body, opts = {}) {
+    const LETTERS = ['A', 'B', 'C', 'D'];
+    section.items.forEach((item, idx) => {
+      const row = h('div', { class: 'quiz-item quiz-item--pic-choose' });
+      row.appendChild(h('div', { class: 'quiz-item__num' }, String(idx + 1)));
+
+      // 上方:音频按钮
+      const audioRow = h('div', { class: 'q-pc-audio' });
+      const audioBtn = h('button', { class: 'q-audio-btn' }, '🔊 听一听');
+      audioBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // rate 0.85 · 低年级听得清
+        playQuizAudio(item.audio, audioBtn, item.audioText, { rate: 0.85 });
+      });
+      audioRow.appendChild(audioBtn);
+      row.appendChild(audioRow);
+
+      // 下方:3 张图/emoji 选项
+      const userAns = section.userAnswers[item.id];
+      const opts3 = h('div', { class: 'q-pc-options' });
+      (item.options || []).forEach((opt, i) => {
+        const cell = h('button', { class: 'q-pc-option', type: 'button' });
+        cell.appendChild(h('div', { class: 'q-pc-letter' }, LETTERS[i] + '.'));
+        // 优先图片 · 无图 fallback emoji
+        const imgUrl = opt.image ? resolveQuizAsset(opt.image, 'image') : null;
+        if (imgUrl) {
+          cell.appendChild(h('img', { src: imgUrl, alt: opt.label || '', loading: 'lazy', class: 'q-pc-img' }));
+        } else if (opt.emoji) {
+          cell.appendChild(h('div', { class: 'q-pc-emoji' }, opt.emoji));
+        }
+        if (opt.label) cell.appendChild(h('div', { class: 'q-pc-label' }, opt.label));
+
+        if (userAns === i) cell.classList.add('selected');
+        if (opts.review) {
+          cell.disabled = true;
+          if (i === item.correct) cell.classList.add('correct');
+          else if (userAns === i && userAns !== item.correct) cell.classList.add('wrong');
+        } else {
+          cell.addEventListener('click', () => {
+            section.userAnswers[item.id] = i;
+            // 只 toggle class · 不重渲(保滚动位置)
+            opts3.querySelectorAll('.q-pc-option').forEach((b, bi) => {
+              b.classList.toggle('selected', bi === i);
+            });
+          });
+        }
+        opts3.appendChild(cell);
+      });
+      row.appendChild(opts3);
+      body.appendChild(row);
+    });
+  };
 
   /* -------- 一、听录音选词 -------- */
   QUIZ_RENDERERS['listen-choose'] = function(section, body, opts = {}) {
@@ -2765,7 +3406,7 @@
       row.appendChild(h('div', { class: 'quiz-item__num' }, String(idx + 1)));
       const prompt = h('div', { class: 'quiz-item__prompt' });
       const audioBtn = h('button', { class: 'q-audio-btn' }, '🔊');
-      audioBtn.addEventListener('click', (e) => { e.stopPropagation(); playQuizAudio(item.audio, audioBtn); });
+      audioBtn.addEventListener('click', (e) => { e.stopPropagation(); playQuizAudio(item.audio, audioBtn, item.audioText, { rate: 0.85 }); });
       prompt.appendChild(audioBtn);
       row.appendChild(prompt);
       row.appendChild(buildChoiceButtons(item, item.options, null, opts));
@@ -2781,7 +3422,7 @@
 
       const prompt = h('div', { class: 'quiz-item__prompt' });
       const audioBtn = h('button', { class: 'q-audio-btn' }, '🔊');
-      audioBtn.addEventListener('click', (e) => { e.stopPropagation(); playQuizAudio(item.audio, audioBtn); });
+      audioBtn.addEventListener('click', (e) => { e.stopPropagation(); playQuizAudio(item.audio, audioBtn, item.audioText, { rate: 0.85 }); });
       prompt.appendChild(audioBtn);
 
       const imgUrl = resolveQuizAsset(item.image, 'image');
@@ -3182,7 +3823,8 @@
     const audioRow = h('div', { class: 'quiz-item', style: 'justify-content: center;' });
     const bigBtn = h('button', { class: 'btn btn--lg btn--pink' }, '🔊 播放整段对话');
     bigBtn.addEventListener('click', () => {
-      playQuizAudio(item.audio, bigBtn, item.audioText);
+      // 对话偏长,放慢让孩子有反应时间
+      playQuizAudio(item.audio, bigBtn, item.audioText, { rate: 0.85 });
     });
     audioRow.appendChild(bigBtn);
     body.appendChild(audioRow);
@@ -3200,41 +3842,64 @@
     if (!item) return;
     const userAns = section.userAnswers[item.id] = section.userAnswers[item.id] || {};
 
+    const count = item.sequence.length;    // 动态支持 5/6 图(真卷 5,默认 6)
+
     if (!opts.review) {
-      const topRow = h('div', { class: 'quiz-item', style: 'justify-content: center;' });
-      const playAllBtn = h('button', { class: 'btn btn--lg btn--pink' }, '▶️ 顺序播 6 句');
+      // 紧凑控制条(不用 .quiz-item 大卡片,省 ~40px 给图片)
+      const topRow = h('div', { class: 'q-order-controls' });
+      const playAllBtn = h('button', { class: 'btn btn--sm btn--pink' }, '▶️ 顺序播 ' + count + ' 句');
       playAllBtn.addEventListener('click', async () => {
         playAllBtn.disabled = true;
-        for (const ref of item.sequence) {
+        for (const seq of item.sequence) {
+          // sequence 元素支持 string (ref) 或 object {ref, audioText}
+          const ref  = typeof seq === 'string' ? seq : seq.ref;
+          const text = (typeof seq === 'object' && seq) ? seq.audioText : null;
           await new Promise(res => {
-            const url = resolveQuizAsset(ref, 'audio');
-            if (!url) { res(); return; }
+            const url = ref ? resolveQuizAsset(ref, 'audio') : null;
             stopCurrent();
-            const a = new Audio(url);
-            currentAudio = a;
-            a.onended = a.onerror = () => { if (currentAudio === a) currentAudio = null; res(); };
-            a.play().catch(res);
+            const playTTS = () => { if (text) speakTTS(text, { rate: 0.85 }).then(res); else res(); };
+            if (!url) { playTTS(); return; }
+            // 先 HEAD 探测,404 退 TTS
+            fetch(url, { method: 'HEAD' }).then(r2 => {
+              if (!r2.ok) throw 0;
+              const a = new Audio(url);
+              a.playbackRate = 0.85;
+              currentAudio = a;
+              a.onended = a.onerror = () => { if (currentAudio === a) currentAudio = null; res(); };
+              a.play().catch(() => playTTS());
+            }).catch(() => playTTS());
           });
-          await new Promise(r => setTimeout(r, 500));
+          await new Promise(r => setTimeout(r, 1500));
         }
         playAllBtn.disabled = false;
       });
-      topRow.appendChild(playAllBtn);
+      const hint = h('span', { class: 'q-order-hint' }, '点数字给图片排序 · 1 最早,' + count + ' 最晚');
+      topRow.append(playAllBtn, hint);
       body.appendChild(topRow);
     }
 
     const grid = h('div', { class: 'q-order-grid' });
-    item.images.forEach((imgRef, imgIdx) => {
+    item.images.forEach((img, imgIdx) => {
+      // 支持两种 image 格式:
+      //   string: 'vocab:xxx' / 'emoji:🐦' (老数据结构 · 正确序通过 sequence.indexOf 推)
+      //   object: { image:'...', correctOrder:N } (真卷 · 直接指定正确序,对 emoji/TTS 友好)
+      const imgRef = typeof img === 'string' ? img : img.image;
+      const explicitOrder = (typeof img === 'object' && img) ? img.correctOrder : null;
       const cell = h('div', { class: 'q-order-cell' });
-      const imgUrl = resolveQuizAsset(imgRef, 'image');
-      if (imgUrl) cell.appendChild(h('img', { src: imgUrl, loading: 'lazy' }));
+      // emoji 兜底 (ref 开头 'emoji:🐦')
+      if (typeof imgRef === 'string' && imgRef.startsWith('emoji:')) {
+        cell.appendChild(h('div', { class: 'q-order-emoji' }, imgRef.slice(6)));
+      } else {
+        const imgUrl = resolveQuizAsset(imgRef, 'image');
+        if (imgUrl) cell.appendChild(h('img', { src: imgUrl, loading: 'lazy' }));
+      }
       const nums = h('div', { class: 'q-order-nums' });
-      for (let n = 1; n <= 6; n++) {
+      for (let n = 1; n <= count; n++) {
         const nb = h('button', { class: 'q-order-num' }, String(n));
         if (userAns[imgIdx] === n) nb.classList.add('selected');
         if (opts.review) {
           nb.disabled = true;
-          const expected = item.sequence.indexOf(imgRef) + 1;
+          const expected = explicitOrder != null ? explicitOrder : (item.sequence.indexOf(imgRef) + 1);
           if (userAns[imgIdx] === n) {
             if (n === expected) nb.classList.add('correct');
             else nb.classList.add('wrong');
@@ -3265,9 +3930,12 @@
 
     const today = new Date().toISOString().slice(0, 10);
     const done = STATE.tasksDone[today] || {};
-    const doneCount = Object.values(done).filter(x => x).length;
     const unit = unitForDay(STATE.currentDay);
+    // lesson 任务按 unit 分记(同一天切 unit 不会错显已完成)
+    const lessonKey = unit ? ('lesson_u' + unit.id) : 'lesson';
     const dueWords = srsGetDueWords(50).length;
+    // 按本 unit 的三项算完成数,避免跨 unit 计数
+    const doneCount = [lessonKey, 'vocabSrs', 'dictation'].filter(k => done[k]).length;
 
     const page = h('div', { style: 'max-width: 980px; margin: 0 auto; padding: 16px 24px;' });
     page.appendChild(h('h2', { style: 'text-align: center;' }, '🎯 今日任务'));
@@ -3277,7 +3945,7 @@
     // ——— 流程引导条 ———
     // 3 步流程:主课 → 闯关 → 默写,当前步骤加 pulse 高亮,已完成打钩
     const FLOW_STEPS = [
-      { id: 'lesson',   emoji: '🎧', label: '1. 主课' },
+      { id: lessonKey,  emoji: '🎧', label: '1. 主课' },
       { id: 'vocabSrs', emoji: '🧠', label: '2. 闯关' },
       { id: 'dictation',emoji: '✏️', label: '3. 默写' },
     ];
@@ -3305,7 +3973,7 @@
 
     const tasks = [
       {
-        id: 'lesson',
+        id: lessonKey,
         title: '🎧 听力吸收',
         desc: `整单元 ${unit ? unit.titleZh : ''}闯关 · 听/跟/填/背/换 5 关`,
         time: '10-15 分钟',
@@ -4717,12 +5385,15 @@
       return;
     }
 
-    // 分类：先按 id 前缀判断是句 / 词 / 字母
+    // 分类:句 / 词 / quiz 题
     const sentenceItems = [];
     const vocabItems = [];
+    const quizItems = [];
     ids.forEach(id => {
       const rec = bank[id];
-      if (typeof SENTENCES_BY_ID !== 'undefined' && SENTENCES_BY_ID[id]) {
+      if (id.startsWith('qz:') && rec.quizSnapshot) {
+        quizItems.push({ id, type: 'quiz', data: rec.quizSnapshot, rec });
+      } else if (typeof SENTENCES_BY_ID !== 'undefined' && SENTENCES_BY_ID[id]) {
         sentenceItems.push({ id, type: 'sent', data: SENTENCES_BY_ID[id], rec });
       } else if (typeof VOCAB !== 'undefined') {
         const w = [...(VOCAB.core||[]), ...(VOCAB.rhyme||[]), ...(VOCAB.alphabet||[])].find(x => x.id === id);
@@ -4731,7 +5402,7 @@
     });
 
     const summary = h('p', { class: 'review-summary' },
-      `共 ${ids.length} 道错题 · ${vocabItems.length} 个单词 + ${sentenceItems.length} 个句子。点 "我会了" 消除。`
+      `共 ${ids.length} 道错题 · ${vocabItems.length} 词 + ${sentenceItems.length} 句 + ${quizItems.length} 试卷题。点 "我会了" 消除。`
     );
     page.appendChild(summary);
 
@@ -4742,13 +5413,48 @@
     controls.appendChild(h('button', { class: 'btn btn--sm', onclick: goHome }, '🏠 主页'));
     page.appendChild(controls);
 
-    // 列表
+    // 列表 (vocab + sent + quiz)
     const list = h('div', { class: 'review-list' });
     [...vocabItems, ...sentenceItems].forEach(it => {
       list.appendChild(renderReviewCard(it));
     });
+    quizItems.forEach(it => list.appendChild(renderQuizReviewCard(it)));
     page.appendChild(list);
     screen.appendChild(page);
+  }
+
+  // 渲染 quiz 错题卡 (来自 mistakeBank quizSnapshot)
+  function renderQuizReviewCard(it) {
+    const snap = it.data;
+    const card = h('div', { class: 'review-card review-card--quiz' });
+    card.appendChild(h('div', { class: 'review-thumb review-thumb--emoji' }, '📝'));
+    const info = h('div', { class: 'review-info' });
+    info.appendChild(h('div', { class: 'review-en', style: 'font-size:0.95rem;' }, snap.sectionTitle || ''));
+    info.appendChild(h('div', { class: 'review-zh' }, '📌 ' + quizItemSummary(snap.type, snap.item)));
+    info.appendChild(h('div', { class: 'review-meta' },
+      h('span', { style: 'color:#c40;' }, '你: ' + snap.userText),
+      ' · ',
+      h('span', { style: 'color:#1f5d1f;' }, '答: ' + snap.correctText),
+    ));
+    if (snap.item.explanation) {
+      info.appendChild(h('div', { class: 'qrs-explain-cell', style: 'margin-top:6px; font-size:0.85rem;' },
+        '💡 ' + snap.item.explanation));
+    }
+    info.appendChild(h('div', { class: 'review-meta' },
+      `❌ 错 ${it.rec.wrong} 次 · 上次 ${it.rec.lastWrong || '—'}`
+    ));
+    card.appendChild(info);
+
+    const actions = h('div', { class: 'review-actions' });
+    const knowBtn = h('button', { class: 'btn btn--sm btn--mint' }, '✓ 我会了');
+    knowBtn.addEventListener('click', () => {
+      delete STATE.mistakeBank[it.id];
+      saveState();
+      renderErrorReview();
+    });
+    actions.appendChild(knowBtn);
+    card.appendChild(actions);
+    return card;
   }
 
   function renderReviewCard(it) {
@@ -5131,7 +5837,12 @@
           const b = h('button', { class: 'btn btn--sm' }, `U${u.id} ${u.emoji}`);
           b.addEventListener('click', () => {
             m.close();
-            template.render(u.id);
+            // quiz 模板 · 如果 unit 有 QUIZ_PAPERS (固定卷) 则先让用户选卷
+            if (template.id === 'quiz' && typeof QUIZ_PAPERS !== 'undefined' && QUIZ_PAPERS[u.id]) {
+              openPrintPaperPicker(u.id, template);
+            } else {
+              template.render(u.id);
+            }
           });
           grid.appendChild(b);
         });
@@ -5141,6 +5852,32 @@
           const allBtn = h('button', { class: 'btn btn--lg btn--pink', style: 'grid-column: span 4;', onclick: () => { m.close(); template.render(null); } }, '📋 生成错题表');
           grid.appendChild(allBtn);
         }
+        return grid;
+      })(),
+      h('div', { class: 'modal-footer' }, h('button', { class: 'btn', onclick: () => m.close() }, '取消'))
+    ));
+  }
+
+  // 有固定卷的 unit · 打印前让用户选哪套卷
+  function openPrintPaperPicker(unit, template) {
+    const papers = QUIZ_PAPERS[unit] || [];
+    const m = modal(h('div', {},
+      h('h3', {}, `Unit ${unit} · 选要打印的卷子`),
+      (() => {
+        const grid = h('div', { style: 'display: flex; flex-direction: column; gap: 10px; margin: 16px 0;' });
+        papers.forEach(p => {
+          const b = h('button', { class: 'btn btn--lg btn--pink' },
+            h('div', { style: 'font-weight:700;' }, p.title),
+            h('div', { style: 'font-size:0.8rem; opacity:0.9;' }, p.subtitle || '')
+          );
+          b.style.textAlign = 'left';
+          b.addEventListener('click', () => { m.close(); template.render(unit, p.id); });
+          grid.appendChild(b);
+        });
+        // 兜底:随机抽题卷(老行为)
+        const rand = h('button', { class: 'btn btn--sm' }, '🎲 随机抽题卷(练习用)');
+        rand.addEventListener('click', () => { m.close(); template.render(unit, null); });
+        grid.appendChild(rand);
         return grid;
       })(),
       h('div', { class: 'modal-footer' }, h('button', { class: 'btn', onclick: () => m.close() }, '取消'))
@@ -5214,11 +5951,15 @@
   }
 
   // —— 模板 3: 模拟试卷 (A4 · 12 大题笔试版，听力用音频 ID 标注) ——
-  function renderPrintQuiz(unit) {
+  function renderPrintQuiz(unit, paperId) {
     if (typeof QUIZ_BANKS === 'undefined' || !QUIZ_BANKS[unit]) {
       toast('此单元题库待建'); return;
     }
-    const paper = generateQuizPaper(unit);
+    // 指定 paperId · 走固定卷(Sim1/Sim2/Real1),否则随机抽
+    const paper = paperId && typeof generatePaperById === 'function'
+      ? generatePaperById(unit, paperId)
+      : generateQuizPaper(unit);
+    if (!paper) { toast('卷子找不到'); return; }
     const body = h('div', { class: 'print-quiz' });
     body.appendChild(h('h2', { class: 'pq-title' }, `${paper.title} · 单元测试卷`));
     body.appendChild(h('div', { class: 'pq-meta' },
@@ -5227,9 +5968,28 @@
       h('span', {}, '得分：_______ / 100')
     ));
 
+    // 单 item 多空题型 · 按空数算总分;否则按 item 数
+    const sectionPoints = (sec) => {
+      if (sec.type === 'listen-fill-choose' || sec.type === 'letter-fill') {
+        return (sec.items[0]?.blanks?.length || 0) * sec.pointsPerItem;
+      }
+      if (sec.type === 'dialog-line-fill') {
+        return Object.keys(sec.items[0]?.answers || {}).length * sec.pointsPerItem;
+      }
+      if (sec.type === 'listen-order') {
+        return (sec.items[0]?.images?.length || 1) * sec.pointsPerItem;
+      }
+      if (sec.type === 'listen-match-pic') {
+        return (sec.items[0]?.persons?.length || 0) * sec.pointsPerItem;
+      }
+      if (sec.type === 'match-columns' || sec.type === 'dialog-fill' || sec.type === 'listen-fill') {
+        return sec.pointsPerItem;  // 老题型 1 item 拿满分
+      }
+      return sec.items.length * sec.pointsPerItem;
+    };
     paper.sections.forEach(sec => {
       const s = h('div', { class: 'pq-section' });
-      s.appendChild(h('h3', {}, sec.title + ` (共 ${sec.items.length * sec.pointsPerItem} 分)`));
+      s.appendChild(h('h3', {}, sec.title + ` (共 ${sectionPoints(sec)} 分)`));
       if (sec.hint) s.appendChild(h('p', { class: 'pq-hint' }, sec.hint));
 
       const type = sec.type;
@@ -5317,14 +6077,137 @@
         const item = sec.items[0];
         if (item) {
           const grid = h('div', { class: 'pq-order-grid' });
-          item.images.forEach((imgRef, idx) => {
+          item.images.forEach((img, idx) => {
             const cell = h('div', { class: 'pq-order-cell' });
-            const imgUrl = resolveQuizAsset(imgRef, 'image');
-            if (imgUrl) cell.appendChild(h('img', { src: imgUrl, class: 'pq-order-img' }));
+            // 支持 string ref 或 object {image, correctOrder}
+            const imgRef = typeof img === 'string' ? img : img.image;
+            if (typeof imgRef === 'string' && imgRef.startsWith('emoji:')) {
+              cell.appendChild(h('div', { class: 'pq-order-emoji' }, imgRef.slice(6)));
+            } else {
+              const imgUrl = resolveQuizAsset(imgRef, 'image');
+              if (imgUrl) cell.appendChild(h('img', { src: imgUrl, class: 'pq-order-img' }));
+            }
             cell.appendChild(h('div', { class: 'pq-order-num-box' }, '(   )'));
             grid.appendChild(cell);
           });
           s.appendChild(grid);
+        }
+      } else if (type === 'listen-pic-choose') {
+        // 新: 听录音选图 · 每题 3 图 + 括号
+        sec.items.forEach((item, i) => {
+          const row = h('div', { class: 'pq-pc-row' });
+          row.appendChild(h('div', { class: 'pq-pc-num' }, `${i + 1}. (   )`));
+          const opts = h('div', { class: 'pq-pc-opts' });
+          (item.options || []).forEach((opt, j) => {
+            const cell = h('div', { class: 'pq-pc-cell' });
+            cell.appendChild(h('div', { class: 'pq-pc-letter' }, String.fromCharCode(65 + j) + '.'));
+            if (opt.image?.startsWith('emoji:')) {
+              cell.appendChild(h('div', { class: 'pq-pc-emoji' }, opt.image.slice(6)));
+            } else if (opt.image) {
+              const u = resolveQuizAsset(opt.image, 'image');
+              if (u) cell.appendChild(h('img', { src: u, class: 'pq-pc-img' }));
+            } else if (opt.emoji) {
+              cell.appendChild(h('div', { class: 'pq-pc-emoji' }, opt.emoji));
+            }
+            opts.appendChild(cell);
+          });
+          row.appendChild(opts);
+          s.appendChild(row);
+        });
+      } else if (type === 'listen-match-pic') {
+        // 新: 听录音连线 · 左人名右 A-E 图
+        const item = sec.items[0];
+        if (item) {
+          const table = h('table', { class: 'pq-match' });
+          const persons = item.persons || [];
+          const targets = item.targets || [];
+          const maxRows = Math.max(persons.length, targets.length);
+          for (let i = 0; i < maxRows; i++) {
+            const tr = h('tr', {});
+            const p = persons[i];
+            const t = targets[i];
+            tr.appendChild(h('td', {}, p ? `${p.id}. ${p.name}` : ''));
+            tr.appendChild(h('td', { style: 'width:40px; text-align:center;' }, '____'));
+            const tcell = h('td', {});
+            if (t) {
+              tcell.appendChild(h('span', { style: 'font-weight:700; margin-right:6px;' }, t.id + '.'));
+              if (t.image?.startsWith('emoji:')) {
+                tcell.appendChild(h('span', { style: 'font-size:1.4rem;' }, t.image.slice(6)));
+              } else {
+                const u = resolveQuizAsset(t.image, 'image');
+                if (u) tcell.appendChild(h('img', { src: u, style: 'width:40px; height:40px; object-fit:contain; vertical-align:middle;' }));
+              }
+              if (t.label) tcell.appendChild(h('span', { style: 'margin-left:6px;' }, t.label));
+            }
+            tr.appendChild(tcell);
+            table.appendChild(tr);
+          }
+          s.appendChild(table);
+        }
+      } else if (type === 'listen-fill-choose') {
+        // 新: 听对话 · 每空 A/B 选
+        const item = sec.items[0];
+        if (item) {
+          (item.dialog || []).forEach(line => {
+            let parts = [];
+            if (line.speaker) parts.push(line.speaker + ': ');
+            (line.parts || []).forEach(p => {
+              if (p.t != null) parts.push(p.t);
+              else if (typeof p.blank === 'number') {
+                const b = item.blanks[p.blank];
+                const opts = (b.options || []).map((o, oi) => `${String.fromCharCode(65+oi)}.${o}`).join(' ');
+                parts.push(` (${p.blank + 1}) _____ [ ${opts} ] `);
+              }
+            });
+            s.appendChild(h('div', { class: 'pq-item' }, parts.join('')));
+          });
+        }
+      } else if (type === 'letter-fill') {
+        // 新: 字母前后邻居填空
+        const item = sec.items[0];
+        if (item) {
+          (item.blanks || []).forEach((b, i) => {
+            const opts = (b.options || []).map((o, oi) => `${String.fromCharCode(65+oi)}.${o}`).join('   ');
+            s.appendChild(h('div', { class: 'pq-item' },
+              `${i + 1}. (   )  ${b.before}  →  _____  →  ${b.after}     ${opts}`
+            ));
+          });
+        }
+      } else if (type === 'pic-sentence-choose') {
+        // 新: 图 + 2 句选 1
+        sec.items.forEach((item, i) => {
+          const row = h('div', { class: 'pq-ps-row' });
+          row.appendChild(h('div', { class: 'pq-ps-num' }, `${i + 1}. (   )`));
+          if (item.image?.startsWith('emoji:')) {
+            row.appendChild(h('div', { class: 'pq-ps-emoji' }, item.image.slice(6)));
+          } else {
+            const u = resolveQuizAsset(item.image, 'image');
+            if (u) row.appendChild(h('img', { src: u, class: 'pq-ps-img' }));
+          }
+          const opts = h('div', { class: 'pq-ps-opts' });
+          (item.options || []).forEach((o, j) => {
+            opts.appendChild(h('div', {}, `${String.fromCharCode(65 + j)}. ${o}`));
+          });
+          row.appendChild(opts);
+          s.appendChild(row);
+        });
+      } else if (type === 'dialog-line-fill') {
+        // 新: 对话 A-E 填整句
+        const item = sec.items[0];
+        if (item) {
+          const pool = h('div', { class: 'pq-pool' });
+          pool.appendChild(h('b', {}, '词库: '));
+          (item.pool || []).forEach(p => {
+            pool.appendChild(h('span', { style: 'margin-right:12px;' }, `${p.id}. ${p.text}`));
+          });
+          s.appendChild(pool);
+          (item.dialog || []).forEach(line => {
+            let text = (line.speaker ? line.speaker + ': ' : '');
+            if (line.text) text += line.text + ' ';
+            if (line.blank) text += `(${line.blankIdx + 1})_____`;
+            if (line.suffix) text += ' ' + line.suffix;
+            s.appendChild(h('div', { class: 'pq-item' }, text));
+          });
         }
       }
 
