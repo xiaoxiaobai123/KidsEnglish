@@ -2254,7 +2254,8 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
   #toast-root, #modal-root, #confetti-root, #loading-splash {
     display: none !important;
   }
-  .app-shell, .main, .screen, .print-page {
+  .app-shell, .main, .screen, .print-page,
+  .answer-key-wrap {
     display: block !important;
     overflow: visible !important;
     height: auto !important;
@@ -2263,6 +2264,7 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
     margin: 0 !important;
     background: white !important;
   }
+  .answer-key-wrap { padding: 10mm !important; }
   .print-sheet {
     border: none !important;
     box-shadow: none !important;
@@ -2270,7 +2272,106 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
   }
   .pf-card { break-inside: avoid; }
   .pq-section { break-inside: avoid; }
+  .ak-section { break-inside: avoid; page-break-inside: avoid; }
+  .ak-item { break-inside: avoid; page-break-inside: avoid; }
+  /* 模拟试卷打印更紧凑 */
+  .print-quiz .pq-section h3 { font-size: 0.95rem; }
+  .print-quiz .pq-item { font-size: 0.85rem; line-height: 1.4; }
+  .print-quiz .pq-opt { font-size: 0.85rem; margin-right: 8px; }
+  .print-quiz .pq-judge-img { max-height: 70px; }
+  .print-quiz .pq-order-img { max-height: 90px; }
+  .print-quiz .pq-answer-key { break-before: page; page-break-before: always; }
   @page { size: A4; margin: 10mm; }
+}
+
+/* ============================================================
+ * 答案对照页 · Answer Key
+ * ============================================================ */
+.answer-key-wrap {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 18px 20px 40px;
+  font-family: var(--font-zh-body, sans-serif);
+  background: var(--cream, #FFF8E7);
+}
+.answer-key-wrap h2 { font-family: var(--font-zh-title, sans-serif); }
+.ak-section {
+  background: var(--white, #fff);
+  border: 2px solid var(--ink, #222);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 14px;
+  box-shadow: 4px 4px 0 var(--ink, #222);
+}
+.ak-section h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  border-bottom: 1px dashed #aaa;
+  padding-bottom: 4px;
+}
+.ak-item {
+  display: grid;
+  grid-template-columns: 50px 1fr;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px dotted #ddd;
+}
+.ak-item:last-child { border-bottom: none; }
+.ak-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+}
+.ak-head .ak-num { color: #333; }
+.ak-ok .ak-mark  { color: #2c8a4a; }
+.ak-bad .ak-mark { color: #d04848; }
+.ak-detail .ak-q { font-weight: 700; margin-bottom: 4px; }
+.ak-detail .ak-opt { padding: 2px 0; font-size: 0.95rem; }
+.ak-detail .ak-opt.is-correct { color: #2c8a4a; font-weight: 700; }
+.ak-detail .ak-opt.is-wrong { color: #d04848; }
+.ak-detail .ak-opt-inline {
+  display: inline-block;
+  margin-right: 10px;
+  font-size: 0.95rem;
+}
+.ak-detail .ak-opt-inline.is-correct { color: #2c8a4a; font-weight: 700; }
+.ak-detail .ak-opt-inline.is-wrong { color: #d04848; }
+.ak-detail .ak-pair {
+  padding: 2px 0;
+  font-size: 0.95rem;
+}
+.ak-detail .ak-pair.is-correct { color: #2c8a4a; }
+.ak-detail .ak-pair.is-wrong { color: #d04848; }
+.ak-detail .ak-line { padding: 2px 0; font-size: 0.95rem; }
+.ak-detail .ak-note { color: #888; font-size: 0.82rem; margin-top: 4px; }
+.quiz-mode-card--mock { border-color: #d04848; }
+.quiz-mode-card--mock .name { color: #c0392b; }
+
+/* 模拟试卷打印附答案：每题 + 答案表格 */
+.print-quiz .pq-answer-key {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 2px dashed #888;
+}
+.print-quiz .pq-answer-key h3 {
+  font-size: 1rem;
+  margin: 0 0 8px;
+}
+.print-quiz .pq-answer-key .ak-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.print-quiz .pq-answer-key .ak-table td,
+.print-quiz .pq-answer-key .ak-table th {
+  border: 1px solid #888;
+  padding: 4px 6px;
+  text-align: left;
+  vertical-align: top;
+}
+.print-quiz .pq-answer-key .ak-table th {
+  background: #f0f0f0;
 }
 
 /* ============================================================
