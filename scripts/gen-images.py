@@ -68,6 +68,8 @@ VOCAB_PROMPTS = {
     "u3_metoo":    "two kids waving happily saying me too",
     "u3_nothanks": "a kid politely saying no thanks",
     "u3_yesplease":"a kid happily saying yes please",
+    "u3_we":       "a group of three smiling kids standing together pointing to themselves, we, cartoon",
+    "u3_all":      "a circle of five smiling kids holding hands, all together, cartoon",
 
     # Unit 4
     "u4_spring":   "spring season scene with flowers, trees and sunshine",
@@ -129,6 +131,9 @@ VOCAB_PROMPTS = {
     "r_u3_sweet":   "a cute pink candy with sparkles and smile, sweet, cartoon",
     "r_u3_yummy":   "a kid licking lips happily with food, yummy, cartoon",
     "r_u3_eat":     "a kid eating food with fork happily, cartoon",
+    "r_u3_you":     "a smiling kid pointing forward to the viewer, you, cartoon",
+    "r_u3_so":      "a kid with sparkles and stars exclaiming wow so much, cartoon",
+    "r_u3_to":      "a big bright arrow pointing to a school building, going to, cartoon",
     "r_u4_smile":   "a big happy yellow smile with sparkles, cartoon",
     "r_u4_swing":   "a tree branch swinging in wind with motion lines, cartoon",
     "r_u5_flutter": "a butterfly with motion lines fluttering wings, cartoon",

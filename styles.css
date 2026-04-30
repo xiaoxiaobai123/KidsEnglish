@@ -2250,11 +2250,11 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
 /* 打印模式：隐藏外壳，只留内容 */
 @media print {
   body { background: white !important; }
-  .no-print, .topbar, .coach-bubble, .print-toolbar,
+  .no-print, .topbar, .coach-bubble, .print-toolbar, .ak-toolbar,
   #toast-root, #modal-root, #confetti-root, #loading-splash {
     display: none !important;
   }
-  .app-shell, .main, .screen, .print-page {
+  .app-shell, .main, .screen, .print-page, .answer-key-sheet {
     display: block !important;
     overflow: visible !important;
     height: auto !important;
@@ -2270,7 +2270,103 @@ p  { margin: 0 0 var(--s-sm) 0; line-height: 1.5; }
   }
   .pf-card { break-inside: avoid; }
   .pq-section { break-inside: avoid; }
+  .ak-section { break-inside: avoid; page-break-inside: avoid; }
+  .ak-row { break-inside: avoid; }
   @page { size: A4; margin: 10mm; }
+}
+
+/* ============================================================
+ * 答案详解 · Answer Key（屏幕 + 打印共用基础样式）
+ * ============================================================ */
+.answer-key-sheet {
+  background: #FFF8E7;
+  padding: 16px;
+  min-height: 100%;
+}
+.ak-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: white;
+  padding: 10px 14px;
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 14px;
+  position: sticky;
+  top: 8px;
+  z-index: 10;
+}
+.answer-key {
+  background: white;
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 22px 28px;
+  border-radius: 14px;
+  box-shadow: var(--shadow-md);
+  font-family: var(--font-zh-body), 'PingFang SC', sans-serif;
+  color: #222;
+}
+.ak-header { text-align: center; border-bottom: 2px solid #444; padding-bottom: 10px; margin-bottom: 16px; }
+.ak-header h2 { margin: 0 0 6px; font-size: 1.5rem; }
+.ak-header .ak-meta { display: flex; justify-content: center; gap: 24px; font-size: 0.95rem; color: #555; }
+.ak-section { margin-bottom: 18px; }
+.ak-sec-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 8px 0 10px;
+  padding: 6px 10px;
+  background: #fff8e1;
+  border-left: 4px solid #f0b000;
+  font-size: 1.05rem;
+}
+.ak-sec-score { font-size: 0.9rem; color: #d97706; font-weight: 600; }
+.ak-row {
+  margin: 6px 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+.ak-row.ak-ok  { background: #f3f9f0; border-left: 3px solid #6cbf4a; }
+.ak-row.ak-bad { background: #fdf0f0; border-left: 3px solid #d94747; }
+.ak-item { display: flex; flex-direction: column; gap: 4px; }
+.ak-q { font-weight: 600; font-size: 0.96rem; display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.ak-num { color: #555; min-width: 22px; }
+.ak-mark { margin-left: auto; font-weight: 800; }
+.ak-row.ak-ok .ak-mark { color: #2e7d2e; }
+.ak-row.ak-bad .ak-mark { color: #c32d2d; }
+.ak-a { font-size: 0.92rem; color: #333; padding-left: 28px; }
+.ak-label { color: #888; }
+.ak-correct { color: #1f7a1f; font-weight: 600; }
+.ak-wrong { color: #c32d2d; text-decoration: line-through; }
+.ak-img { max-height: 90px; border: 1px solid #ddd; border-radius: 6px; margin: 4px 0; }
+.ak-match-tbl { margin-left: 28px; border-collapse: collapse; font-size: 0.92rem; }
+.ak-match-tbl td { padding: 3px 10px 3px 0; vertical-align: top; }
+.ak-fill-list { padding-left: 28px; display: flex; flex-direction: column; gap: 3px; font-size: 0.92rem; }
+.ak-fill-row { display: flex; gap: 6px; }
+.ak-order-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  padding: 8px 0 0 28px;
+}
+.ak-order-cell { text-align: center; }
+.ak-order-img { max-width: 100%; max-height: 80px; border: 1px solid #ddd; border-radius: 4px; }
+.ak-order-mark { font-size: 0.78rem; color: #333; line-height: 1.4; margin-top: 2px; }
+
+@media (max-width: 700px) {
+  .ak-order-grid { grid-template-columns: repeat(3, 1fr); }
+  .answer-key { padding: 16px; }
+  .ak-header .ak-meta { flex-direction: column; gap: 4px; }
+}
+
+/* 模拟卷专用 mode card 高亮 */
+.quiz-mode-card--mock {
+  border: 2px dashed #f0b000;
+  background: linear-gradient(135deg, #fff8e1 0%, #fff 100%);
+}
+.quiz-mode-card--mock:hover {
+  border-style: solid;
+  box-shadow: 0 4px 0 rgba(240, 176, 0, 0.4);
 }
 
 /* ============================================================

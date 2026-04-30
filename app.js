@@ -2351,12 +2351,13 @@
     ));
   }
 
-  // —— 模式选择（模拟考 / 练习）——
+  // —— 模式选择（模拟考 / 练习 / U3 模拟卷）——
   function renderQuizModePicker(unit) {
     switchScreen('quiz');
     const screen = $('#screen-quiz');
     screen.innerHTML = '';
     const bank = QUIZ_BANKS[unit];
+    const hasMock = (unit === 3) && (typeof U3_MOCK_PAPERS !== 'undefined');
     const page = h('div', { class: 'quiz-mode-picker' },
       h('h2', {}, `📝 ${bank.title}`),
       h('p', { style: 'color: var(--ink-light);' }, '选个做题模式：'),
@@ -2378,7 +2379,27 @@
           );
           c.addEventListener('click', () => startQuizSession(unit, 'practice'));
           return c;
-        })()
+        })(),
+        ...(hasMock ? [
+          (() => {
+            const c = h('div', { class: 'quiz-mode-card quiz-mode-card--mock' },
+              h('div', { class: 'icon' }, '📄'),
+              h('div', { class: 'name' }, '模拟卷一'),
+              h('div', { class: 'desc' }, '高质量定卷 · 内容固定 · 12 大题 · 考完看答案详解。')
+            );
+            c.addEventListener('click', () => startMockQuizSession(unit, 1));
+            return c;
+          })(),
+          (() => {
+            const c = h('div', { class: 'quiz-mode-card quiz-mode-card--mock' },
+              h('div', { class: 'icon' }, '📄'),
+              h('div', { class: 'name' }, '模拟卷二'),
+              h('div', { class: 'desc' }, '另一套高质量定卷 · 难度略高 · 考完看答案详解。')
+            );
+            c.addEventListener('click', () => startMockQuizSession(unit, 2));
+            return c;
+          })(),
+        ] : [])
       ),
       h('div', { style: 'margin-top: 24px;' },
         h('button', { class: 'btn btn--sm', onclick: renderQuizPicker }, '‹ 换单元')
@@ -2402,6 +2423,17 @@
     QUIZ.paper = paper;
     QUIZ.sectionIdx = 0;
     QUIZ.mode = mode;
+    renderQuizSection();
+  }
+
+  // —— U3 模拟卷一 / 卷二（exam 模式 + 末尾答案详解）——
+  function startMockQuizSession(unit, mockId) {
+    if (typeof generateMockPaper !== 'function') { toast('模拟卷未加载'); return; }
+    const paper = generateMockPaper(unit, mockId);
+    if (!paper || !paper.sections.length) { toast('该模拟卷未配置'); return; }
+    QUIZ.paper = paper;
+    QUIZ.sectionIdx = 0;
+    QUIZ.mode = 'exam';   // 模拟卷统一走考试流，末尾再看答案
     renderQuizSection();
   }
 
@@ -2664,12 +2696,208 @@
         })
       ),
       h('div', { class: 'result-actions', style: 'margin-top: 20px;' },
+        h('button', { class: 'btn btn--lg btn--mint', onclick: () => renderAnswerKey(paper) }, '📋 查看答案详解'),
         h('button', { class: 'btn btn--lg btn--pink', onclick: goHome }, '🏠 回主页'),
         h('button', { class: 'btn btn--lg btn--blue', onclick: renderQuizPicker }, '🔁 再测')
       )
     );
     screen.appendChild(page);
     spawnConfetti(finalPct >= 90 ? 80 : 30);
+  }
+
+  /* ============================================================
+   * 答案详解（mock 卷与所有 quiz 通用）
+   * 全卷一页排版 → 每道题：题干 + 用户答 + 正确答 + 对错标记
+   * 支持打印
+   * ============================================================ */
+  function renderAnswerKey(paper) {
+    switchScreen('quiz');
+    const screen = $('#screen-quiz');
+    screen.innerHTML = '';
+
+    const totalScored = paper.sections.reduce((s, sec) => s + (sec.scored || 0), 0);
+    const totalPossible = paper.sections.reduce((s, sec) => s + sec.items.length * sec.pointsPerItem, 0);
+
+    const sheet = h('div', { class: 'answer-key-sheet' });
+    sheet.appendChild(h('div', { class: 'ak-toolbar no-print' },
+      h('button', { class: 'btn btn--sm', onclick: () => finishQuizSessionRender(paper) }, '‹ 回成绩'),
+      h('h3', { style: 'flex:1; text-align:center; margin:0;' }, `📋 ${paper.title} · 答案详解`),
+      h('button', { class: 'btn btn--lg btn--pink', onclick: () => window.print() }, '🖨️ 打印 / 保存 PDF')
+    ));
+
+    const inner = h('div', { class: 'answer-key' });
+
+    inner.appendChild(h('div', { class: 'ak-header' },
+      h('h2', {}, paper.title),
+      h('div', { class: 'ak-meta' },
+        h('span', {}, `得分：${totalScored} / ${totalPossible}`),
+        h('span', {}, `日期：${new Date().toISOString().slice(0,10)}`),
+      )
+    ));
+
+    paper.sections.forEach(sec => {
+      const block = h('div', { class: 'ak-section' });
+      const total = sec.items.length * sec.pointsPerItem;
+      block.appendChild(h('h3', { class: 'ak-sec-title' },
+        sec.title,
+        h('span', { class: 'ak-sec-score' }, `${sec.scored || 0} / ${total} 分`)
+      ));
+
+      sec.items.forEach((item, i) => {
+        const user = sec.userAnswers[item.id];
+        const ok   = isItemCorrect(sec.type, item, user);
+        const row  = h('div', { class: 'ak-row ' + (ok ? 'ak-ok' : 'ak-bad') });
+        row.appendChild(renderAnswerKeyItem(sec.type, item, user, i + 1, ok));
+        block.appendChild(row);
+      });
+
+      inner.appendChild(block);
+    });
+
+    sheet.appendChild(inner);
+    screen.appendChild(sheet);
+  }
+
+  // 单题答案详解渲染
+  function renderAnswerKeyItem(type, item, user, num, ok) {
+    const wrap = h('div', { class: 'ak-item' });
+    const numTag = h('span', { class: 'ak-num' }, `${num}.`);
+    const okTag  = h('span', { class: 'ak-mark' }, ok ? '✓' : '✗');
+
+    if (type === 'listen-choose' || type === 'listen-response') {
+      const opts = item.options || [];
+      const userTxt = (user != null && opts[user] != null) ? opts[user] : '（未答）';
+      const correctTxt = opts[item.correct];
+      const audioHint = item.audioText ? `「${item.audioText}」` : (item.audio ? `[${item.audio.split(':')[1] || ''}]` : '');
+      wrap.appendChild(h('div', { class: 'ak-q' }, numTag, audioHint, okTag));
+      wrap.appendChild(h('div', { class: 'ak-a' },
+        h('span', { class: 'ak-label' }, '你的答案：'), h('span', {}, userTxt),
+        h('span', { class: 'ak-label', style:'margin-left:16px;' }, '正确答案：'), h('span', { class: 'ak-correct' }, correctTxt)
+      ));
+    } else if (type === 'listen-judge' || type === 'pic-judge') {
+      const correctTxt = item.correct ? '✓ 相符' : '✗ 不符';
+      const userTxt = (user === true) ? '✓ 相符' : (user === false) ? '✗ 不符' : '（未答）';
+      const desc = item.text ? `「${item.text}」` : (item.audio ? `听 ${item.audio.split(':')[1] || ''}` : '');
+      wrap.appendChild(h('div', { class: 'ak-q' }, numTag, desc, okTag));
+      const imgUrl = resolveQuizAsset(item.image, 'image');
+      if (imgUrl) wrap.appendChild(h('img', { src: imgUrl, class: 'ak-img' }));
+      wrap.appendChild(h('div', { class: 'ak-a' },
+        h('span', { class: 'ak-label' }, '你的：'), h('span', {}, userTxt),
+        h('span', { class: 'ak-label', style:'margin-left:16px;' }, '正确：'), h('span', { class: 'ak-correct' }, correctTxt)
+      ));
+    } else if (type === 'odd-one-out') {
+      const items = item.items || [];
+      const userTxt = (user != null && items[user] != null) ? items[user] : '（未答）';
+      const correctTxt = items[item.correct];
+      wrap.appendChild(h('div', { class: 'ak-q' }, numTag, items.join(' / '), okTag));
+      wrap.appendChild(h('div', { class: 'ak-a' },
+        h('span', { class: 'ak-label' }, '你的：'), h('span', {}, userTxt),
+        h('span', { class: 'ak-label', style:'margin-left:16px;' }, '正确：'), h('span', { class: 'ak-correct' }, correctTxt + (item.note ? `（${item.note}）` : ''))
+      ));
+    } else if (type === 'scenario') {
+      const opts = item.options || [];
+      const userTxt = (user != null && opts[user] != null) ? opts[user] : '（未答）';
+      const correctTxt = opts[item.correct];
+      wrap.appendChild(h('div', { class: 'ak-q' }, numTag, item.scene, okTag));
+      wrap.appendChild(h('div', { class: 'ak-a' },
+        h('span', { class: 'ak-label' }, '你的：'), h('span', {}, userTxt),
+        h('span', { class: 'ak-label', style:'margin-left:16px;' }, '正确：'), h('span', { class: 'ak-correct' }, correctTxt)
+      ));
+    } else if (type === 'letter-neighbor') {
+      const userBefore = user?.before || '_';
+      const userAfter  = user?.after  || '_';
+      const ok2 = (userBefore === item.before && userAfter === item.after);
+      wrap.appendChild(h('div', { class: 'ak-q' }, numTag, `__ ${item.letter} __`, h('span', { class: 'ak-mark' }, ok2 ? '✓' : '✗')));
+      wrap.appendChild(h('div', { class: 'ak-a' },
+        h('span', { class: 'ak-label' }, '你的：'), h('span', {}, `${userBefore} ${item.letter} ${userAfter}`),
+        h('span', { class: 'ak-label', style:'margin-left:16px;' }, '正确：'), h('span', { class: 'ak-correct' }, `${item.before} ${item.letter} ${item.after}`)
+      ));
+    } else if (type === 'match-columns') {
+      wrap.appendChild(h('div', { class: 'ak-q' }, numTag, '连线题正确对应', okTag));
+      const tbl = h('table', { class: 'ak-match-tbl' });
+      item.pairs.forEach((p, i) => {
+        const userPick = user?.[i];
+        const got = (userPick === i);
+        tbl.appendChild(h('tr', {},
+          h('td', {}, `${i+1}. ${p.q}`),
+          h('td', { class: 'ak-correct' }, `→  ${p.a}`),
+          h('td', {}, got ? '✓' : `✗（你选了 ${userPick != null ? item.pairs[userPick].a : '空'}）`)
+        ));
+      });
+      wrap.appendChild(tbl);
+    } else if (type === 'dialog-fill' || type === 'listen-fill') {
+      wrap.appendChild(h('div', { class: 'ak-q' }, numTag, '对话补全', okTag));
+      const blanks = [];
+      item.dialog.forEach(line => line.parts.forEach(p => { if (p.blank) blanks.push(p.blank); }));
+      const ul = h('div', { class: 'ak-fill-list' });
+      blanks.forEach((ans, i) => {
+        const userVal = user?.[i] || '（未答）';
+        const isOk = userVal === ans;
+        ul.appendChild(h('div', { class: 'ak-fill-row' },
+          h('span', {}, `空 ${i+1}：`),
+          h('span', { class: isOk ? 'ak-correct' : 'ak-wrong' }, userVal),
+          h('span', { style: 'margin-left:8px;' }, isOk ? '✓' : `→ 正确 ${ans}`)
+        ));
+      });
+      wrap.appendChild(ul);
+    } else if (type === 'listen-order') {
+      wrap.appendChild(h('div', { class: 'ak-q' }, numTag, '排序题', okTag));
+      const grid = h('div', { class: 'ak-order-grid' });
+      item.images.forEach((imgRef, idx) => {
+        const expected = item.sequence.indexOf(imgRef) + 1;
+        const userVal = user?.[idx];
+        const isOk = (userVal === expected);
+        const cell = h('div', { class: 'ak-order-cell' });
+        const url = resolveQuizAsset(imgRef, 'image');
+        if (url) cell.appendChild(h('img', { src: url, class: 'ak-order-img' }));
+        cell.appendChild(h('div', { class: 'ak-order-mark' },
+          h('span', {}, `你：${userVal != null ? userVal : '_'}`),
+          h('span', { class: 'ak-correct' }, ` 正：${expected}`),
+          h('span', {}, isOk ? ' ✓' : ' ✗')
+        ));
+        grid.appendChild(cell);
+      });
+      wrap.appendChild(grid);
+    } else {
+      wrap.appendChild(h('div', { class: 'ak-q' }, numTag, '（题型未支持渲染）', okTag));
+    }
+    return wrap;
+  }
+
+  // 把成绩页重新渲染（不重新计分，因为 paper 已挂在 QUIZ）
+  function finishQuizSessionRender(paper) {
+    QUIZ.paper = paper;
+    // 重走 finishQuizSession 渲染部分（但跳过加分 / 落库），简单做：重 render
+    switchScreen('quiz');
+    const screen = $('#screen-quiz');
+    screen.innerHTML = '';
+    const totalScored = paper.sections.reduce((s, sec) => s + (sec.scored || 0), 0);
+    const totalPossible = paper.sections.reduce((s, sec) => s + sec.items.length * sec.pointsPerItem, 0);
+    const finalPct = totalPossible > 0 ? Math.round(totalScored / totalPossible * 100) : 0;
+    const title = finalPct === 100 ? '💯 满分！' : finalPct >= 90 ? '🏆 优秀！' : finalPct >= 60 ? '✨ 通过' : '💪 继续加油';
+    const page = h('div', { class: 'quiz-result' },
+      h('h2', {}, title),
+      h('div', { class: 'big-score' }, `${finalPct}`),
+      h('div', {}, `${totalScored} / ${totalPossible} 分`),
+      h('h3', { style: 'margin-top: 20px;' }, '📋 分大题成绩'),
+      h('div', { class: 'section-breakdown' },
+        ...paper.sections.map(sec => {
+          const total = sec.items.length * sec.pointsPerItem;
+          const scored = sec.scored || 0;
+          const cls = scored === total ? 'full' : (scored < total * 0.6 ? 'low' : '');
+          return h('div', { class: `sb-row ${cls}` },
+            h('span', {}, `${sec.id}. ${(sec.title || '').slice(3, 15)}`),
+            h('span', {}, `${scored}/${total}`)
+          );
+        })
+      ),
+      h('div', { class: 'result-actions', style: 'margin-top: 20px;' },
+        h('button', { class: 'btn btn--lg btn--mint', onclick: () => renderAnswerKey(paper) }, '📋 查看答案详解'),
+        h('button', { class: 'btn btn--lg btn--pink', onclick: goHome }, '🏠 回主页'),
+        h('button', { class: 'btn btn--lg btn--blue', onclick: renderQuizPicker }, '🔁 再测')
+      )
+    );
+    screen.appendChild(page);
   }
 
   /* ============================================================
@@ -5211,11 +5439,29 @@
   }
 
   // —— 模板 3: 模拟试卷 (A4 · 12 大题笔试版，听力用音频 ID 标注) ——
-  function renderPrintQuiz(unit) {
+  // U3 提供 3 选 1: 随机抽题 / 模拟卷一 / 模拟卷二
+  function renderPrintQuiz(unit, mockId) {
     if (typeof QUIZ_BANKS === 'undefined' || !QUIZ_BANKS[unit]) {
       toast('此单元题库待建'); return;
     }
-    const paper = generateQuizPaper(unit);
+    // U3 且未指定 mockId → 弹一层选哪份
+    if (unit === 3 && mockId == null && typeof U3_MOCK_PAPERS !== 'undefined') {
+      const m = modal(h('div', {},
+        h('h3', {}, '📝 Unit 3 · 选试卷'),
+        h('p', { style:'color:#666;' }, '随机抽题每次内容会变；模拟卷一 / 二 内容固定。'),
+        h('div', { style: 'display:flex; flex-direction:column; gap:10px; margin:16px 0;' },
+          (() => { const b = h('button', { class:'btn btn--lg btn--blue' }, '🎲 随机抽题（练习）'); b.addEventListener('click', () => { m.close(); renderPrintQuiz(3, 0); }); return b; })(),
+          (() => { const b = h('button', { class:'btn btn--lg btn--mint' }, '📄 模拟卷一（定卷）'); b.addEventListener('click', () => { m.close(); renderPrintQuiz(3, 1); }); return b; })(),
+          (() => { const b = h('button', { class:'btn btn--lg btn--coral' }, '📄 模拟卷二（定卷）'); b.addEventListener('click', () => { m.close(); renderPrintQuiz(3, 2); }); return b; })(),
+        ),
+        h('div', { class:'modal-footer' }, h('button', { class:'btn', onclick: () => m.close() }, '取消'))
+      ));
+      return;
+    }
+    const paper = (mockId && typeof generateMockPaper === 'function')
+      ? generateMockPaper(unit, mockId)
+      : generateQuizPaper(unit);
+    if (!paper) { toast('试卷生成失败'); return; }
     const body = h('div', { class: 'print-quiz' });
     body.appendChild(h('h2', { class: 'pq-title' }, `${paper.title} · 单元测试卷`));
     body.appendChild(h('div', { class: 'pq-meta' },
@@ -5438,5 +5684,7 @@
     get STATE() { return STATE; },
     resetState, setDay, goHome, startLesson, saveState,
     renderQuizPicker, startQuizSession,
+    startMockQuizSession, renderAnswerKey,
+    get QUIZ() { return QUIZ; },
   };
 })();
