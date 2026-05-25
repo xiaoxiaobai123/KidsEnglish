@@ -14,7 +14,7 @@
  *   中间网挂也没事,下次打开接着下
  * ============================================================ */
 
-const VERSION = '20260524a';
+const VERSION = '20260525a';
 // 双缓存策略:
 //   CORE_CACHE 跟 VERSION 走,每次代码发版重建 (HTML/JS/CSS/manifest ~300KB)
 //   MEDIA_CACHE 固定名字,版本升级后不清空 (mp3/图 ~30MB 下过就保留)
@@ -250,20 +250,28 @@ self.addEventListener('fetch', (event) => {
   const isStreamMedia = /\.(mp3|mp4|wav|webm|ogg|m4a)$/.test(url.pathname);
 
   event.respondWith((async () => {
-    // 先在主 cache(media 或 core)找,如果没有再到另一个 cache 找(迁移过渡期兼容)
     const primary = await caches.open(cacheName);
-    let cached = await primary.match(req, { ignoreSearch: false, ignoreVary: true });
-    if (!cached) {
+    const findCached = async () => {
+      let cached = await primary.match(req, { ignoreSearch: false, ignoreVary: true });
+      if (cached) return cached;
       const secondary = await caches.open(media ? CORE_CACHE : MEDIA_CACHE);
       cached = await secondary.match(req, { ignoreSearch: false, ignoreVary: true });
       if (cached) {
         // 异步迁到主 cache,方便下次命中
         primary.put(req, cached.clone()).catch(() => {});
       }
-    }
-    if (cached) return cached;
+      return cached;
+    };
 
-    const fetchReq = isStreamMedia ? new Request(req.url, { mode: 'same-origin' }) : req;
+    // 媒体文件大且稳定:cache-first。核心代码/manifest:network-first,避免手机端长期卡旧版本。
+    if (media) {
+      const cached = await findCached();
+      if (cached) return cached;
+    }
+
+    const fetchReq = isStreamMedia
+      ? new Request(req.url, { mode: 'same-origin' })
+      : new Request(req.url, { cache: media ? 'default' : 'reload', credentials: 'same-origin' });
     try {
       const resp = await fetch(fetchReq);
       if (resp.ok && resp.status === 200) {
@@ -271,6 +279,8 @@ self.addEventListener('fetch', (event) => {
       }
       return resp;
     } catch (e) {
+      const cached = await findCached();
+      if (cached) return cached;
       return new Response('', { status: 504, statusText: 'Offline' });
     }
   })());
