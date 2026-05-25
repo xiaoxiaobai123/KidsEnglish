@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>英语闯关 · 更新中</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #fff8e7;
+      color: #332817;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      text-align: center;
+    }
+    main {
+      max-width: 420px;
+      padding: 28px;
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: 28px;
+    }
+    p {
+      margin: 8px 0;
+      line-height: 1.6;
+      color: #6a5130;
+    }
+    button {
+      margin-top: 20px;
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 18px;
+      background: #33c59d;
+      color: white;
+      font-size: 16px;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>正在拿最新版...</h1>
+    <p>会清掉离线缓存和旧 service worker。</p>
+    <p>学习进度、金币、设置会保留。</p>
+    <button id="go">重新进入</button>
+  </main>
+  <script>
+    async function freshStart() {
+      try {
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map(k => caches.delete(k).catch(() => {})));
+        }
+      } catch (e) {}
+      try {
+        if (navigator.serviceWorker) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map(r => r.unregister().catch(() => {})));
+        }
+      } catch (e) {}
+      location.replace('./index.html?_fresh=' + Date.now());
+    }
+    document.getElementById('go').addEventListener('click', freshStart);
+    freshStart();
+  </script>
+</body>
+</html>
