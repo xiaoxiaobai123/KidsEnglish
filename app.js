@@ -2539,6 +2539,43 @@
     );
   }
 
+  function getQuizItemUnitCount(type, item) {
+    if (type === 'listen-order') {
+      return (item.images || item.sequence || []).length || 1;
+    }
+    if (type === 'listen-match-pic') {
+      return (item.persons || []).length || 1;
+    }
+    if (type === 'listen-fill-choose' || type === 'letter-fill') {
+      return (item.blanks || []).length || 1;
+    }
+    if (type === 'dialog-line-fill') {
+      return Object.keys(item.answers || {}).length || 1;
+    }
+    if (type === 'match-columns') {
+      return (item.pairs || []).length || 1;
+    }
+    if (type === 'dialog-fill' || type === 'listen-fill') {
+      let blanks = 0;
+      (item.dialog || []).forEach(line => {
+        (line.parts || []).forEach(p => { if (p.blank) blanks++; });
+      });
+      return blanks || 1;
+    }
+    return 1;
+  }
+
+  function getQuizSectionUnitCount(section) {
+    return (section.items || []).reduce(
+      (sum, item) => sum + getQuizItemUnitCount(section.type, item),
+      0
+    );
+  }
+
+  function getQuizSectionTotal(section) {
+    return getQuizSectionUnitCount(section) * section.pointsPerItem;
+  }
+
   function buildQuizFooter(section) {
     const footer = h('div', { class: 'quiz-footer' });
     footer.appendChild(
@@ -2546,7 +2583,7 @@
     );
     footer.appendChild(
       h('div', { class: 'q-hint' },
-        `${section.items.length} 题 · 每题 ${section.pointsPerItem} 分 · 共 ${section.items.length * section.pointsPerItem} 分`
+        `${getQuizSectionUnitCount(section)} 题 · 每题 ${section.pointsPerItem} 分 · 共 ${getQuizSectionTotal(section)} 分`
       )
     );
     const last = QUIZ.sectionIdx >= QUIZ.paper.sections.length - 1;
@@ -2792,14 +2829,14 @@
     if (type === 'match-columns') {
       if (!user) return 0;
       const cnt = item.pairs.reduce((n, _, i) => n + (user[i] === i ? 1 : 0), 0);
-      return cnt * 2;
+      return cnt * pointsPerItem;
     }
     if (type === 'dialog-fill' || type === 'listen-fill') {
       if (!user) return 0;
       const blanks = [];
       item.dialog.forEach(line => line.parts.forEach(p => { if (p.blank) blanks.push(p.blank); }));
       const cnt = blanks.reduce((n, ans, i) => n + (user[i] === ans ? 1 : 0), 0);
-      return cnt * 2;
+      return cnt * pointsPerItem;
     }
     if (type === 'listen-order') {
       if (!user) return 0;
@@ -2835,7 +2872,7 @@
     switchScreen('quiz');
     const screen = $('#screen-quiz');
     screen.innerHTML = '';
-    const total = section.items.length * section.pointsPerItem;
+    const total = getQuizSectionTotal(section);
     const shell = h('div', { class: 'quiz-shell' },
       h('div', { class: 'quiz-header' },
         h('div', { class: 'q-badge' }, String(section.id)),
@@ -2872,7 +2909,7 @@
   function finishQuizSession() {
     const paper = QUIZ.paper;
     const totalScored = paper.sections.reduce((s, sec) => s + (sec.scored || 0), 0);
-    const totalPossible = paper.sections.reduce((s, sec) => s + sec.items.length * sec.pointsPerItem, 0);
+    const totalPossible = paper.sections.reduce((s, sec) => s + getQuizSectionTotal(sec), 0);
     const finalPct = totalPossible > 0 ? Math.round(totalScored / totalPossible * 100) : 0;
 
     // 计分 + 存进度只做一次(从 review 视图返回时不重复)
@@ -2908,7 +2945,7 @@
       h('h3', { style: 'margin-top: 20px;' }, '📋 分大题成绩'),
       h('div', { class: 'section-breakdown' },
         ...paper.sections.map(sec => {
-          const total = sec.items.length * sec.pointsPerItem;
+          const total = getQuizSectionTotal(sec);
           const scored = sec.scored || 0;
           const cls = scored === total ? 'full' : (scored < total * 0.6 ? 'low' : '');
           return h('div', { class: `sb-row ${cls}` },
@@ -2938,7 +2975,7 @@
 
     // 顶栏:标题 + 总分 + 返回
     const totalScored = paper.sections.reduce((s, sec) => s + (sec.scored || 0), 0);
-    const totalPossible = paper.sections.reduce((s, sec) => s + sec.items.length * sec.pointsPerItem, 0);
+    const totalPossible = paper.sections.reduce((s, sec) => s + getQuizSectionTotal(sec), 0);
     shell.appendChild(h('div', { class: 'quiz-review-header' },
       h('h2', { style: 'margin: 0; flex: 1;' }, `📋 ${paper.title} · 答卷回看`),
       h('div', { class: 'q-progress' }, `${totalScored}/${totalPossible} 分`),
@@ -2949,7 +2986,7 @@
     const body = h('div', { class: 'quiz-body quiz-review-body' });
     paper.sections.forEach(sec => {
       const secWrap = h('div', { class: 'quiz-review-section' });
-      const total = sec.items.length * sec.pointsPerItem;
+      const total = getQuizSectionTotal(sec);
       const scored = sec.scored || 0;
       const okCls = scored === total ? 'qrs-full' : (scored < total * 0.6 ? 'qrs-low' : 'qrs-mid');
       secWrap.appendChild(h('div', { class: 'quiz-review-section-head ' + okCls },
@@ -3009,20 +3046,42 @@
    * ============================================================ */
   const QUIZ_RENDERERS = {};
 
+  function normalizeQuizAudioText(text) {
+    return String(text || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function quizTextAudioId(text) {
+    const src = normalizeQuizAudioText(text);
+    if (!src) return null;
+    let h = 0x811c9dc5;
+    for (let i = 0; i < src.length; i++) {
+      h ^= src.charCodeAt(i);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return 'auto_' + h.toString(16).padStart(8, '0');
+  }
+
+  function resolveQuizTextAudio(text) {
+    const id = quizTextAudioId(text);
+    return id ? `./audio/quiz/${id}.mp3` : null;
+  }
+
   // —— 共用：播放引用音频（resolveQuizAsset 解析 vocab: / sent: / quiz:）——
   //   没 MP3 或加载失败 → 退回 TTS 念 fallbackText
   //   fallbackText 不传就从 ref 提字（vocab:u4_tree → "tree"）
   //   关键：已经进入 MP3 播放通道后 error 不再 fallback，避免 MP3 + TTS 同时叠声
   function playQuizAudio(ref, btn, fallbackText, opts = {}) {
-    const url = resolveQuizAsset(ref, 'audio');
+    let url = resolveQuizAsset(ref, 'audio');
     if (btn) btn.classList.add('playing');
     const doneBtn = () => { if (btn) btn.classList.remove('playing'); };
 
     const ttsText = (() => {
-      if (fallbackText) return fallbackText;
+      if (fallbackText) return normalizeQuizAudioText(fallbackText);
       const [, id] = String(ref || '').split(':');
       return id ? id.split('_').slice(1).join(' ') : '';
     })();
+
+    if (!url && ttsText) url = resolveQuizTextAudio(ttsText);
 
     const ttsFallback = () => {
       if (!ttsText) { doneBtn(); return; }
@@ -3035,9 +3094,10 @@
 
     // 先用 fetch 预检 URL；失败才 TTS，成功才播放 Audio
     //（比 <audio>.onerror 更可控，不会 MP3 开始播了又叠一层 TTS）
-    fetch(url, { method: 'HEAD' }).then(res => {
+    const audioUrl = withVersion(url);
+    fetch(audioUrl, { method: 'HEAD' }).then(res => {
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      const a = new Audio(url);
+      const a = new Audio(audioUrl);
       if (opts.rate) a.playbackRate = opts.rate;
       currentAudio = a;
       let playing = false;
@@ -3853,16 +3913,17 @@
         for (const seq of item.sequence) {
           // sequence 元素支持 string (ref) 或 object {ref, audioText}
           const ref  = typeof seq === 'string' ? seq : seq.ref;
-          const text = (typeof seq === 'object' && seq) ? seq.audioText : null;
+          const text = (typeof seq === 'object' && seq) ? normalizeQuizAudioText(seq.audioText) : null;
           await new Promise(res => {
-            const url = ref ? resolveQuizAsset(ref, 'audio') : null;
+            const url = ref ? resolveQuizAsset(ref, 'audio') : resolveQuizTextAudio(text);
             stopCurrent();
             const playTTS = () => { if (text) speakTTS(text, { rate: 0.85 }).then(res); else res(); };
             if (!url) { playTTS(); return; }
             // 先 HEAD 探测,404 退 TTS
-            fetch(url, { method: 'HEAD' }).then(r2 => {
+            const audioUrl = withVersion(url);
+            fetch(audioUrl, { method: 'HEAD' }).then(r2 => {
               if (!r2.ok) throw 0;
-              const a = new Audio(url);
+              const a = new Audio(audioUrl);
               a.playbackRate = 0.85;
               currentAudio = a;
               a.onended = a.onerror = () => { if (currentAudio === a) currentAudio = null; res(); };
@@ -5968,25 +6029,7 @@
       h('span', {}, '得分：_______ / 100')
     ));
 
-    // 单 item 多空题型 · 按空数算总分;否则按 item 数
-    const sectionPoints = (sec) => {
-      if (sec.type === 'listen-fill-choose' || sec.type === 'letter-fill') {
-        return (sec.items[0]?.blanks?.length || 0) * sec.pointsPerItem;
-      }
-      if (sec.type === 'dialog-line-fill') {
-        return Object.keys(sec.items[0]?.answers || {}).length * sec.pointsPerItem;
-      }
-      if (sec.type === 'listen-order') {
-        return (sec.items[0]?.images?.length || 1) * sec.pointsPerItem;
-      }
-      if (sec.type === 'listen-match-pic') {
-        return (sec.items[0]?.persons?.length || 0) * sec.pointsPerItem;
-      }
-      if (sec.type === 'match-columns' || sec.type === 'dialog-fill' || sec.type === 'listen-fill') {
-        return sec.pointsPerItem;  // 老题型 1 item 拿满分
-      }
-      return sec.items.length * sec.pointsPerItem;
-    };
+    const sectionPoints = (sec) => getQuizSectionTotal(sec);
     paper.sections.forEach(sec => {
       const s = h('div', { class: 'pq-section' });
       s.appendChild(h('h3', {}, sec.title + ` (共 ${sectionPoints(sec)} 分)`));

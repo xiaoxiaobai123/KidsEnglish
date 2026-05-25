@@ -14,7 +14,7 @@
  *   中间网挂也没事,下次打开接着下
  * ============================================================ */
 
-const VERSION = '20260425c';
+const VERSION = '20260524a';
 // 双缓存策略:
 //   CORE_CACHE 跟 VERSION 走,每次代码发版重建 (HTML/JS/CSS/manifest ~300KB)
 //   MEDIA_CACHE 固定名字,版本升级后不清空 (mp3/图 ~30MB 下过就保留)
@@ -193,6 +193,7 @@ async function buildMediaUrlList() {
     const m = await fetch('./audio/manifest.json').then(r => r.json());
     (m.sentences || []).forEach(id => urls.add(`./audio/sentences/${id}.mp3`));
     (m.vocab || []).forEach(id => urls.add(`./audio/vocab/${id}.mp3`));
+    (m.quiz || []).forEach(id => urls.add(`./audio/quiz/${id}.mp3`));
     Object.keys(m.coach || {}).forEach(id => {
       urls.add(`./audio/coach/${id}.mp3`);
       urls.add(`./audio/coach/${id}_ethan.mp3`);  // 多名字兜底
