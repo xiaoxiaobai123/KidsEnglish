@@ -3316,6 +3316,206 @@ QUIZ_PAPERS[7].push({
   ],
 });
 
+QUIZ_PAPERS[7].push({
+  id: 'u7_paperExam1',
+  title: 'U7 应试卷',
+  subtitle: "校内单元测试 · What's that? + 动物叫声 + 颜色描述",
+  source: 'Unit 7 单元应试优化卷',
+  totalPoints: 100,
+  sections: [
+    { id:1, type:'listen-pic-choose',
+      title:'一、听录音,选出与所听内容相符的图片(听两遍)', titleEn:'Listen and choose',
+      hint:'先听动物叫声,再听动物名', pointsPerItem:2,
+      items:[
+        { id:'U7E1_1_01', audioText:"Baa! It's a lamb.",
+          options:[{ image:'vocab:u7_pig', label:'pig' },{ image:'vocab:u7_lamb', label:'lamb' },{ image:'vocab:u7_duck', label:'duck' }], correct:1 },
+        { id:'U7E1_1_02', audioText:"Shh! It's a pig.",
+          options:[{ image:'vocab:u7_pig', label:'pig' },{ image:'vocab:u7_cow', label:'cow' },{ image:'vocab:u7_lamb', label:'lamb' }], correct:0 },
+        { id:'U7E1_1_03', audioText:"Quack! It's a duck.",
+          options:[{ image:'vocab:u7_cow', label:'cow' },{ image:'vocab:u7_lamb', label:'lamb' },{ image:'vocab:u7_duck', label:'duck' }], correct:2 },
+        { id:'U7E1_1_04', audioText:'Moo! A cow.',
+          options:[{ image:'vocab:u7_duck', label:'duck' },{ image:'vocab:u7_cow', label:'cow' },{ image:'vocab:u7_pig', label:'pig' }], correct:1 },
+        { id:'U7E1_1_05', audioText:'A little white lamb.',
+          options:[{ image:'vocab:u7_lamb', label:'lamb' },{ image:'vocab:u7_pig', label:'pig' },{ image:'vocab:u7_cow', label:'cow' }], correct:0 },
+      ]},
+
+    { id:2, type:'listen-order',
+      title:'二、听录音,根据所听内容用数字给下列图片排序(听两遍)', titleEn:'Listen and order',
+      hint:'按听到的动物顺序标 1-5', pointsPerItem:2,
+      items:[{
+        id:'U7E1_2_01',
+        sequence:[
+          { audioText:"What's that? Shh! It's a pig." },
+          { audioText:"Baa! It's a lamb." },
+          { audioText:"Quack! It's a duck." },
+          { audioText:"It's a cow." },
+          { audioText:'Mary has a little lamb.' },
+        ],
+        images:[
+          { image:'vocab:u7_duck', correctOrder:3 },
+          { image:'vocab:u7_cow', correctOrder:4 },
+          { image:'vocab:u7_pig', correctOrder:1 },
+          { image:'vocab:r_u7_mary', correctOrder:5 },
+          { image:'vocab:u7_lamb', correctOrder:2 },
+        ],
+      }]},
+
+    { id:3, type:'listen-judge',
+      title:'三、听录音,判断图片是否与所听内容相符(听两遍)', titleEn:'Listen and judge',
+      hint:'听清 pig/lamb/duck/cow 和 pink/black/white', pointsPerItem:2,
+      items:[
+        { id:'U7E1_3_01', audioText:'The pig is pink.', image:'vocab:u7_pig', correct:true },
+        { id:'U7E1_3_02', audioText:"Quack! It's a duck.", image:'vocab:u7_cow', correct:false },
+        { id:'U7E1_3_03', audioText:'The cow is black.', image:'vocab:u7_cow', correct:true },
+        { id:'U7E1_3_04', audioText:'A little white lamb.', image:'vocab:u7_duck', correct:false },
+        { id:'U7E1_3_05', audioText:'Its fleece is white as snow.', image:'vocab:r_u7_white', correct:true },
+      ]},
+
+    { id:4, type:'listen-match-pic',
+      title:'四、听录音,将人物与对应图片连线(听两遍)', titleEn:'Listen and match',
+      hint:'听人名后的动物或颜色关键词', pointsPerItem:2,
+      items:[{
+        id:'U7E1_4_01',
+        persons:[
+          { id:1, name:'Mary', face:'emoji:👧', audioText:'Mary has a little lamb. It is white.', expectedTarget:'B' },
+          { id:2, name:'Mike', face:'emoji:👦', audioText:"What's that? It is a cow.", expectedTarget:'D' },
+          { id:3, name:'Helen', face:'emoji:👧', audioText:'Quack, quack! I can see a duck.', expectedTarget:'A' },
+          { id:4, name:'Tim', face:'emoji:🧒', audioText:'Shh! Look at the pink pig.', expectedTarget:'C' },
+          { id:5, name:'Su Hai', face:'emoji:👧', audioText:'The cow is black and the lamb is white.', expectedTarget:'E' },
+        ],
+        targets:[
+          { id:'A', image:'vocab:u7_duck', label:'duck' },
+          { id:'B', image:'vocab:u7_lamb', label:'lamb' },
+          { id:'C', image:'vocab:u7_pig', label:'pig' },
+          { id:'D', image:'vocab:u7_cow', label:'cow' },
+          { id:'E', image:'vocab:r_u7_white', label:'white' },
+        ],
+      }]},
+
+    { id:5, type:'listen-response',
+      title:'五、听录音,选择合适的答语(听两遍)', titleEn:'Listen and choose response',
+      hint:"What's that? 回答 It's a ...; 叫声题直接选动物", pointsPerItem:2,
+      items:[
+        { id:'U7E1_5_01', audioText:"What's that?", options:['A bottle and a hankie.', "It's a pig."], correct:1 },
+        { id:'U7E1_5_02', audioText:'Baa!', options:["It's a lamb.", "It's a duck."], correct:0 },
+        { id:'U7E1_5_03', audioText:'Quack!', options:["It's a cow.", "It's a duck."], correct:1 },
+        { id:'U7E1_5_04', audioText:'What colour is the pig?', options:["It's pink.", "It's a pig."], correct:0 },
+        { id:'U7E1_5_05', audioText:'Can you see the cow?', options:['Three lambs.', 'Yes, I can.'], correct:1 },
+      ]},
+
+    { id:6, type:'listen-fill-choose',
+      title:'六、听录音,选择合适的单词完成对话(听两遍)', titleEn:'Listen and fill',
+      hint:'先听完整对话,再看空格', pointsPerItem:2,
+      items:[{
+        id:'U7E1_6_01',
+        audioText:"A: What's that? B: Shh! It's a pig. A: Baa! B: It's a lamb. A: Quack! B: It's a duck. A: Moo! B: It's a cow.",
+        dialog:[
+          { speaker:'A', parts:[{t:"What's "},{blank:0},{t:'?'}] },
+          { speaker:'B', parts:[{t:'Shh! It is a '},{blank:1},{t:'.'}] },
+          { speaker:'A', parts:[{t:'Baa!'}] },
+          { speaker:'B', parts:[{t:"It's a "},{blank:2},{t:'.'}] },
+          { speaker:'A', parts:[{t:'Quack!'}] },
+          { speaker:'B', parts:[{t:"It's a "},{blank:3},{t:'.'}] },
+          { speaker:'A', parts:[{t:'Moo!'}] },
+          { speaker:'B', parts:[{t:"It's a "},{blank:4},{t:'.'}] },
+        ],
+        blanks:[
+          { options:['this','that'], correct:1 },
+          { options:['pig','cow'], correct:0 },
+          { options:['duck','lamb'], correct:1 },
+          { options:['duck','pig'], correct:0 },
+          { options:['lamb','cow'], correct:1 },
+        ],
+      }]},
+
+    { id:7, type:'letter-fill',
+      title:'一、根据字母表顺序写出空缺字母的大小写', titleEn:'Alphabet fill',
+      hint:'应试保分题: Ll-Qq 和 Uu-Zz', pointsPerItem:1,
+      items:[{
+        id:'U7E1_7_01',
+        blanks:[
+          { before:'Kk', after:'Mm', options:['Ll','Nn','Jj'], correct:0 },
+          { before:'Ll', after:'Nn', options:['Oo','Mm','Kk'], correct:1 },
+          { before:'Mm', after:'Oo', options:['Nn','Pp','Ll'], correct:0 },
+          { before:'Tt', after:'Vv', options:['Ww','Uu','Ss'], correct:1 },
+          { before:'Xx', after:'Zz', options:['Yy','Ww','Vv'], correct:0 },
+        ],
+      }]},
+
+    { id:8, type:'odd-one-out',
+      title:'二、选出不同类的一项', titleEn:'Find the odd one out',
+      hint:'动物、叫声、颜色词分清楚', pointsPerItem:1,
+      items:[
+        { id:'U7E1_8_01', items:['pig','duck','white'], correct:2 },
+        { id:'U7E1_8_02', items:['Baa','lamb','Quack'], correct:1 },
+        { id:'U7E1_8_03', items:['cow','duck','snow'], correct:2 },
+        { id:'U7E1_8_04', items:['pink','black','white'], correct:0 },
+        { id:'U7E1_8_05', items:['little','lamb','pig'], correct:0 },
+      ]},
+
+    { id:9, type:'pic-sentence-choose',
+      title:'三、根据图片内容,选择合适的句子', titleEn:'Pick the matching sentence',
+      hint:'看图匹配整句,不要只看一个熟词', pointsPerItem:1,
+      items:[
+        { id:'U7E1_9_01', image:'vocab:u7_pig', options:["What's that? It's a pig.", "What's that? It's a cow."], correct:0 },
+        { id:'U7E1_9_02', image:'vocab:u7_lamb', options:["Quack! It's a duck.", "Baa! It's a lamb."], correct:1 },
+        { id:'U7E1_9_03', image:'vocab:u7_duck', options:["It's a duck.", "It's a cow."], correct:0 },
+        { id:'U7E1_9_04', image:'vocab:u7_cow', options:["It's a lamb.", "It's a cow."], correct:1 },
+        { id:'U7E1_9_05', image:'vocab:r_u7_white', options:['Its fleece is white as snow.', 'The pig is pink.'], correct:0 },
+      ]},
+
+    { id:10, type:'scenario',
+      title:'四、根据情境,选择合适的英文表达', titleEn:'Pick the right response',
+      hint:'校内常考交际题,优先看情境关键词', pointsPerItem:1,
+      items:[
+        { id:'U7E1_10_01', scene:'你想问远处那个是什么,可以说:', options:["What's that?", "What's this?"], correct:0 },
+        { id:'U7E1_10_02', scene:'想让别人安静一点,可以说:', options:['Well done!', 'Shh!'], correct:1 },
+        { id:'U7E1_10_03', scene:'听到鸭子的叫声,可以说:', options:["Quack! It's a duck.", "Baa! It's a lamb."], correct:0 },
+        { id:'U7E1_10_04', scene:'想说“它是一头奶牛”,可以说:', options:["It's a lamb.", "It's a cow."], correct:1 },
+        { id:'U7E1_10_05', scene:'想描述小羊像雪一样白,可以说:', options:['It is white as snow.', 'It is black as snow.'], correct:0 },
+      ]},
+
+    { id:11, type:'match-columns',
+      title:'五、从 II 栏中选出 I 栏相对应的答句', titleEn:'Match',
+      hint:'问答和叫声配对', pointsPerItem:2,
+      items:[{
+        id:'U7E1_11_01',
+        pairs:[
+          { q:"What's that?", a:"It's a pig." },
+          { q:'Baa!', a:"It's a lamb." },
+          { q:'Quack!', a:"It's a duck." },
+          { q:'Moo!', a:"It's a cow." },
+          { q:'Mary has a little lamb.', a:'Its fleece is white as snow.' },
+        ],
+      }]},
+
+    { id:12, type:'dialog-line-fill',
+      title:'六、从方框中选择合适的句子完成对话', titleEn:'Dialog line fill',
+      hint:'读上下句,按课文顺序补全', pointsPerItem:2,
+      items:[{
+        id:'U7E1_12_01',
+        pool:[
+          { id:'A', text:"It's a lamb." },
+          { id:'B', text:"What's that?" },
+          { id:'C', text:"It's a duck." },
+          { id:'D', text:'Shh!' },
+          { id:'E', text:"It's a cow." },
+        ],
+        dialog:[
+          { speaker:'A', blank:true, blankIdx:0 },
+          { speaker:'B', blank:true, blankIdx:1, suffix:"It's a pig." },
+          { speaker:'A', text:'Baa!' },
+          { speaker:'B', blank:true, blankIdx:2 },
+          { speaker:'A', text:'Quack!' },
+          { speaker:'B', blank:true, blankIdx:3 },
+          { speaker:'A', text:'Moo!' },
+          { speaker:'B', blank:true, blankIdx:4 },
+        ],
+        answers:{ 0:'B', 1:'D', 2:'A', 3:'C', 4:'E' },
+      }]},
+  ],
+});
+
 QUIZ_PAPERS[8].push({
   id: 'u8_paperText1',
   title: '课文卷 · U8 易错强化',
