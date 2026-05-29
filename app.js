@@ -3430,11 +3430,15 @@
         const cell = h('button', { class: 'q-pc-option', type: 'button' });
         cell.appendChild(h('div', { class: 'q-pc-letter' }, LETTERS[i] + '.'));
         // 优先图片 · 无图 fallback emoji
-        const imgUrl = opt.image ? resolveQuizAsset(opt.image, 'image') : null;
-        if (imgUrl) {
-          cell.appendChild(h('img', { src: imgUrl, alt: opt.label || '', loading: 'lazy', class: 'q-pc-img' }));
-        } else if (opt.emoji) {
-          cell.appendChild(h('div', { class: 'q-pc-emoji' }, opt.emoji));
+        if (opt.image?.startsWith('emoji:')) {
+          cell.appendChild(h('div', { class: 'q-pc-emoji' }, opt.image.slice(6)));
+        } else {
+          const imgUrl = opt.image ? resolveQuizAsset(opt.image, 'image') : null;
+          if (imgUrl) {
+            cell.appendChild(h('img', { src: imgUrl, alt: opt.label || '', loading: 'lazy', class: 'q-pc-img' }));
+          } else if (opt.emoji) {
+            cell.appendChild(h('div', { class: 'q-pc-emoji' }, opt.emoji));
+          }
         }
         if (opt.label) cell.appendChild(h('div', { class: 'q-pc-label' }, opt.label));
 
@@ -3485,10 +3489,14 @@
       audioBtn.addEventListener('click', (e) => { e.stopPropagation(); playQuizAudio(item.audio, audioBtn, item.audioText, { rate: 0.85 }); });
       prompt.appendChild(audioBtn);
 
-      const imgUrl = resolveQuizAsset(item.image, 'image');
-      if (imgUrl) {
-        prompt.appendChild(h('div', { class: 'q-thumb' }, h('img', { src: imgUrl, loading: 'lazy', alt: '' })));
+      const thumb = h('div', { class: 'q-thumb' });
+      if (item.image?.startsWith('emoji:')) {
+        thumb.appendChild(h('div', { class: 'q-thumb-emoji' }, item.image.slice(6)));
+      } else {
+        const imgUrl = resolveQuizAsset(item.image, 'image');
+        if (imgUrl) thumb.appendChild(h('img', { src: imgUrl, loading: 'lazy', alt: '' }));
       }
+      if (thumb.childNodes.length) prompt.appendChild(thumb);
       row.appendChild(prompt);
 
       const userAns = section.userAnswers[item.id];
@@ -3618,10 +3626,14 @@
       row.appendChild(h('div', { class: 'quiz-item__num' }, String(idx + 1)));
 
       const prompt = h('div', { class: 'quiz-item__prompt' });
-      const imgUrl = resolveQuizAsset(item.image, 'image');
-      if (imgUrl) {
-        prompt.appendChild(h('div', { class: 'q-thumb' }, h('img', { src: imgUrl, loading: 'lazy', alt: '' })));
+      const thumb = h('div', { class: 'q-thumb' });
+      if (item.image?.startsWith('emoji:')) {
+        thumb.appendChild(h('div', { class: 'q-thumb-emoji' }, item.image.slice(6)));
+      } else {
+        const imgUrl = resolveQuizAsset(item.image, 'image');
+        if (imgUrl) thumb.appendChild(h('img', { src: imgUrl, loading: 'lazy', alt: '' }));
       }
+      if (thumb.childNodes.length) prompt.appendChild(thumb);
       prompt.appendChild(h('div', { class: 'q-sent-text' }, item.text));
       row.appendChild(prompt);
 
@@ -6051,9 +6063,11 @@
         sec.items.forEach((item, i) => {
           const cell = h('div', { class: 'pq-judge-cell' });
           cell.appendChild(h('div', { class: 'pq-judge-num' }, `${i + 1}.`));
-          const imgUrl = resolveQuizAsset(item.image, 'image');
-          if (imgUrl) {
-            cell.appendChild(h('img', { src: imgUrl, class: 'pq-judge-img' }));
+          if (item.image?.startsWith('emoji:')) {
+            cell.appendChild(h('div', { class: 'pq-judge-emoji' }, item.image.slice(6)));
+          } else {
+            const imgUrl = resolveQuizAsset(item.image, 'image');
+            if (imgUrl) cell.appendChild(h('img', { src: imgUrl, class: 'pq-judge-img' }));
           }
           if (item.text) {
             cell.appendChild(h('div', { class: 'pq-judge-text' }, item.text));
@@ -6346,8 +6360,12 @@
       sec.items.forEach((item, i) => {
         const cell = h('div', { class:'pq-judge-cell' });
         cell.appendChild(h('div', { class:'pq-judge-num' }, `${i + 1}.`));
-        const imgUrl = resolveQuizAsset(item.image, 'image');
-        if (imgUrl) cell.appendChild(h('img', { src: imgUrl, class:'pq-judge-img' }));
+        if (item.image?.startsWith('emoji:')) {
+          cell.appendChild(h('div', { class:'pq-judge-emoji' }, item.image.slice(6)));
+        } else {
+          const imgUrl = resolveQuizAsset(item.image, 'image');
+          if (imgUrl) cell.appendChild(h('img', { src: imgUrl, class:'pq-judge-img' }));
+        }
         if (item.text) cell.appendChild(h('div', { class:'pq-judge-text' }, item.text));
         cell.appendChild(h('div', { class:'pq-judge-box' }, '(      )'));
         row.appendChild(cell);
@@ -6428,10 +6446,15 @@
       const item = sec.items[0];
       if (item) {
         const grid = h('div', { class:'pq-order-grid' });
-        item.images.forEach((imgRef, idx) => {
+        item.images.forEach((img, idx) => {
           const cell = h('div', { class:'pq-order-cell' });
-          const imgUrl = resolveQuizAsset(imgRef, 'image');
-          if (imgUrl) cell.appendChild(h('img', { src: imgUrl, class:'pq-order-img' }));
+          const imgRef = typeof img === 'string' ? img : img.image;
+          if (typeof imgRef === 'string' && imgRef.startsWith('emoji:')) {
+            cell.appendChild(h('div', { class:'pq-order-emoji' }, imgRef.slice(6)));
+          } else {
+            const imgUrl = resolveQuizAsset(imgRef, 'image');
+            if (imgUrl) cell.appendChild(h('img', { src: imgUrl, class:'pq-order-img' }));
+          }
           cell.appendChild(h('div', { class:'pq-order-num-box' }, `(    )`));
           grid.appendChild(cell);
         });
